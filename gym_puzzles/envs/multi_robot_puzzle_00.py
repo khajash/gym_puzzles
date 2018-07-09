@@ -9,22 +9,19 @@ import gym
 from gym import spaces
 from gym.utils import colorize, seeding
 
-# import my_gym
+import my_gym
 import pyglet
 from pyglet import gl
 
 # This is an environment in which an octagon robot assembles a simple puzzle
 #
-# Reward: There is a living penalty of -0.05. 
+# Reward: 
 #
 # State:
-#
-# To solve the game you need to get ?? points in ??? time steps.
-#
+##
 # Created by Kate Hajash.
-# SCALED_UP = True
 
-DS = 1. 		# downsample
+DS = 1. 	# downsample
 FPS    = 50 	# Smaller number is faster, larger number is slower
 SCALE  = 30.0   # affects how fast-paced the game is, forces should be adjusted as well
 
@@ -33,8 +30,8 @@ VIEWPORT_W, VIEWPORT_H = int(640/DS), int(480/DS)
 BORDER 	= 1		# border around screen to avoid placing blocks
 
 # ROBOT SETTINGS
-FR 		= 0.999 	# friction (between bodies)
-RES 	= 0			# restitution 
+FR 	= 0.999 	# friction (between bodies)
+RES 	= 0		# restitution 
 DAMP 	= 5.0		# damping
 DENSE 	= 5.0		# density of blocks
 SPEED 	= 10/SCALE*4	# speed of robot agent
@@ -42,11 +39,6 @@ SPEED 	= 10/SCALE*4	# speed of robot agent
 # PRECISION FOR BLOCKS IN PLACE
 EPSILON = 25.0/DS
 ANG_EPSILON = 0.1
-
-# REWARD STRUCTURE
-LIVING_PENALTY = -0.01
-BLOCK_REWARD = 10
-FINAL_REWARD = 10000
 
 # AGENT
 S = 2*DS # scale of agents and blocks
@@ -158,7 +150,7 @@ class MultiRobotPuzzle(gym.Env):
 
 		self.num_agents = self.number_agents
 		self.agents = None
-		self.block_names = ['t_block'] # 'l_block', 'i_block']
+		self.block_names = ['t_block'] 
 		self.blocks = None
 		self.block_queue = self.block_names.copy()
 		self.goal_block = None
@@ -166,7 +158,6 @@ class MultiRobotPuzzle(gym.Env):
 		self.blks_in_place = 0
 		self.prev_blks_in_place = 0
 		self.boundary = None
-		# self.reward = 0
 
 		self.block_final_pos = set_final_loc(VIEWPORT_W, VIEWPORT_H, PUZZLE_REL_LOCATION)
 		self.agent_dist = {}
@@ -178,7 +169,6 @@ class MultiRobotPuzzle(gym.Env):
 
 		# DEFINE Observation Boundaries
 		self.theta_threshold = 2*np.pi
-		# a_obs = [np.inf, np.inf, self.theta_threshold, np.inf, np.inf, np.inf, np.inf] * self.num_agents
 		a_obs = [np.inf, np.inf, np.inf, np.inf] * self.num_agents
 		# Global location and rotation (3), relative location (2), distance to block, contact 
 		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] # Block 1 (rel location, rel theta, distance)
@@ -228,9 +218,9 @@ class MultiRobotPuzzle(gym.Env):
 		self.weight_agent_dist 			= agentDistance
 		self.weight_deltaBlock 			= blockDelta
 		self.weight_blk_dist 			= blockDistance
-		self.puzzle_complete_reward 	= puzzleComp
+		self.puzzle_complete_reward 		= puzzleComp
 		self.out_of_bounds_penalty		= outOfBounds
-		self.blk_out_of_bounds_penalty 	= blkOutOfBounds
+		self.blk_out_of_bounds_penalty 		= blkOutOfBounds
 
 	def update_params(self, timestep, decay):
 		# self.shaped_bounds_penalty = self.out_of_bounds_penalty*decay**(-timestep)
@@ -295,10 +285,6 @@ class MultiRobotPuzzle(gym.Env):
 					self.agent_dist[agent.userData] = distance(
 						agent.worldCenter*SCALE, 
 						block.worldCenter*SCALE)
-					# print(agent.userData, agent.worldCenter*SCALE)
-					# print(distance(
-					# 	agent.worldCenter*SCALE, 
-					# 	block.worldCenter*SCALE))
 
 	def _set_next_goal_block(self):
 		for block in self.blocks:
@@ -399,11 +385,6 @@ class MultiRobotPuzzle(gym.Env):
 	def is_in_place(self, x, y, angle, block):
 		
 		f_x, f_y, f_angle = self.block_final_pos[block.userData]
-		# f_x /= SCALE
-		# f_y /= SCALE
-		# print('is_in_place:')
-		# print("final_position:", f_x, f_y, f_angle)
-		# print("current_loc:", x, y, angle)
 
 		if abs(f_x - x) > EPSILON:
 			return False
@@ -465,13 +446,6 @@ class MultiRobotPuzzle(gym.Env):
 
 		self._calculate_distance()
 		self._calculate_agent_distance()
-		# for k, v in self.agent_dist.items():
-		# 	print(k, v)
-
-		# for k, v in prev_agent_dist.items():
-		# 	print("prev location")
-		# 	print(k, v)
-
 
 		# RETRIEVE Block locations + SET STATE
 		in_place = []
@@ -481,12 +455,6 @@ class MultiRobotPuzzle(gym.Env):
 		self.state = []
 
 		for agent in self.agents:
- 			# ADD global location	
-			# self.state.extend([
-			# 	agent.worldCenter[0]*SCALE, 
-			# 	agent.worldCenter[1]*SCALE, 
-			# 	agent.angle % (2*np.pi)
-			# 	])
 			# ADD location relative to goal block 
 			x, y = self.goal_block.worldCenter
 			self.state.extend([
@@ -518,7 +486,6 @@ class MultiRobotPuzzle(gym.Env):
 				x, y = block.GetWorldPoint(v)
 				self.state.extend([x*SCALE, y*SCALE])
 
-
 		# CALCULATE rewards
 		reward = 0
 
@@ -543,7 +510,6 @@ class MultiRobotPuzzle(gym.Env):
 			if agent.goal_contact:
 				# print("in contact with BLOCK!")
 				reward += 0.25
-
 
 		# CHECK if DONE
 		done = False
@@ -687,22 +653,6 @@ class MultiRobotPuzzleHeavy(MultiRobotPuzzle):
 	def __init__(self):
 		super(MultiRobotPuzzleHeavy, self).__init__()
 		# self.num_agents = 3
-
-# class RobotPuzzlePixels(RobotPuzzle):
-# 	downsample = 1 # for paperspace w/ lowres screen
-# 	obs_type = 'image'
-
-
-# class RobotPuzzleHighRes(RobotPuzzle):
-# 	downsample = 2 # for paperspace w/ lowres screen
-# 	obs_type = 'low-dim'
-
-# class RobotPuzzleHighResPixels(RobotPuzzle):
-# 	downsample = 2 # for paperspace w/ lowres screen
-# 	obs_type = 'image'
-
-####################################################################################################################
-
 
 
 ####################################################################################################################
