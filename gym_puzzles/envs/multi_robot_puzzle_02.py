@@ -27,39 +27,26 @@ FPS    = 50
 SCALE  = 140.0*4   # affects how fast-paced the game is, forces should be adjusted as well
 DS = 1. # downsample
 
-# (240, 320, 3) (1440, 810)
-
-# VIEWPORT_W, VIEWPORT_H = int(1440/4/DS), int(810/4/DS) # divide by 2 for mac screen
-VIEWPORT_W, VIEWPORT_H = int(1440/DS), int(810/DS)
+VIEWPORT_W, VIEWPORT_H = int(1440), int(810)
 BORDER 	= 0.3		# border around screen to avoid placing blocks
 BOUNDS 	= 0.1
 
 # ROBOT SETTINGS
 FR 			= 0.01 	# friction (between bodies)
-RES 		= 0.		# restitution (maxes it bounce)
-LINEAR_DAMP = 5.0
-ANG_DAMP	= 5.0		# damping
-BLK_DENSE 	= 1.56	
-# BLK_DENSE 	= 20.0	
-AGT_DENSE 	= 17.3		# density of blocks
-FORCE 		= 0.75		# speed of robot agent
+RES 			= 0.	# restitution (maxes it bounce)
+LINEAR_DAMP 		= 5.0
+ANG_DAMP		= 5.0	# damping
+BLK_DENSE 		= 1.56	
+AGT_DENSE 		= 17.3	# density of blocks
+FORCE 			= 0.75	# speed of robot agent
 
 # PRECISION FOR BLOCKS IN PLACE
 RATIO = SCALE/VIEWPORT_W
-# EPSILON = 25.0/2
-# EPSILON = 0.05
 EPSILON 	= 0.1
-ANG_EPSILON = 0.1
-# SIMPLE 		= False
-# ANYWHERE 	= True
+ANG_EPSILON 	= 0.1
 
 SIMPLE 		= True
 ANYWHERE 	= False
-
-# REWARD STRUCTURE
-# BLOCK_REWARD = 10
-# FINAL_REWARD = 1000
-# OUT_OF_BOUNDS = 10000
 
 # AGENT
 AGENT_POLY = [
@@ -69,7 +56,7 @@ AGENT_POLY = [
 
 block_color 	= (0.5, 0.5, 0.5)
 agent_color 	= (1., 1., 1.)
-cp_color 		= (1., 1., 1.)
+cp_color 	= (1., 1., 1.)
 final_color 	= (58./255, 153./255, 1)
 
 COLORS = {
@@ -81,7 +68,6 @@ COLORS = {
 	'final_pt'	: final_color,
 	'wall'		: (0.2, 0.2, 0.2)
 }
-
 
 
 class ContactDetector(contactListener):
@@ -228,15 +214,14 @@ class MultiRobotPuzzle2(gym.Env):
 		self.weight_agent_dist 			= agentDistance
 		self.weight_deltaBlock 			= blockDelta
 		self.weight_blk_dist 			= blockDistance
-		self.puzzle_complete_reward 	= puzzleComp
+		self.puzzle_complete_reward 		= puzzleComp
 		self.out_of_bounds_penalty		= outOfBounds
-		self.blk_out_of_bounds_penalty 	= blkOutOfBounds
+		self.blk_out_of_bounds_penalty 		= blkOutOfBounds
 
 	def update_params(self, timestep, decay):
 		self.shaped_bounds_penalty = self.out_of_bounds_penalty*decay**(-timestep)
 		self.shaped_blk_bounds_penalty = self.blk_out_of_bounds_penalty*decay**(-timestep)
 		self.shaped_puzzle_reward = self.puzzle_complete_reward*decay**(-timestep)
-		# print(self.shaped_bounds_penalty, self.shaped_blk_bounds_penalty)
 
 	def update_goal(self, epoch, nb_epochs):
 		self.scaled_epsilon = EPSILON*(2 - epoch/nb_epochs)
@@ -270,32 +255,22 @@ class MultiRobotPuzzle2(gym.Env):
 		return norm_theta
 
 	def _calculate_distance(self):
-
 		for block in self.blocks:
-			# print("block: %s, final_pos: %s, current_loc: %s" % (
-			# 	block.userData, self.block_final_pos[block.userData][:2], self.norm_units(block.worldCenter)))
 			self.block_distance[block.userData] = distance(
 				self.norm_units(block.worldCenter), 
 				self.block_final_pos[block.userData][:2])
-			
 			fangle = self.block_final_pos[block.userData][2]
 			self.block_angle[block.userData] = abs(fangle %(2*np.pi) - abs(block.angle)%(2*np.pi))
 
 	def _calculate_agent_distance(self):
-
 		for block in self.blocks:
 			if block.userData == self.goal_block.userData:
 				for agent in self.agents:
 					self.agent_dist[agent.userData] = distance(
 						self.norm_units(agent.worldCenter), 
 						self.norm_units(block.worldCenter) )
-					# print(agent.userData, agent.worldCenter*SCALE)
-					# print(distance(
-					# 	agent.worldCenter*SCALE, 
-					# 	block.worldCenter*SCALE))
 
 	def _blk_out_of_bounds(self):
-		# OK not unitized??
 		for obj in self.blocks:
 			x, y = obj.worldCenter
 			if x < BOUNDS or x > (VIEWPORT_W/SCALE - BOUNDS):
@@ -305,7 +280,6 @@ class MultiRobotPuzzle2(gym.Env):
 		return False
 
 	def _agt_out_of_bounds(self):
-		# OK not unitized??
 		for obj in self.agents:
 			x, y = obj.worldCenter
 			if x < BOUNDS or x > (VIEWPORT_W/SCALE - BOUNDS):
@@ -608,22 +582,10 @@ class MultiRobotPuzzle2(gym.Env):
 		# DISTANCE of BLOCK 
 		deltaDist = prev_distance[self.goal_block.userData] - self.block_distance[self.goal_block.userData]
 		reward += deltaDist * self.weight_deltaBlock
-		# # print("block deltadistance: %s" % (deltaDist*200)) # <0.05
 		reward -= self.weight_blk_dist * self.block_distance[self.goal_block.userData]
-
-		# FUCKED-UP TESTS!!!
-		# deltaDist = prev_distance[self.goal_block.userData] - self.block_distance[self.goal_block.userData]
-		# reward += deltaDist * 25
-		# # # print("block deltadistance: %s" % (deltaDist*200)) # <0.05
-		# reward -= 0.1 * self.block_distance[self.goal_block.userData]
-
-		# print(0.25 * self.block_distance[self.goal_block.userData])
 		
 		# DISTANCE PENALTY
 		for agent in self.agents:
-			# print("%s's distance: %s" % (agent.userData, self.agent_dist[agent.userData]))
-			# print("prev %s's distance: %s" % (agent.userData, prev_agent_dist[agent.userData]))
-
 			# DISTANCE OF AGENT
 			deltaAgent = prev_agent_dist[agent.userData] - self.agent_dist[agent.userData]
 			# print("%s's deltadistance: %s" % (agent.userData, deltaAgent*100)) # <0.05
