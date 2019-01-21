@@ -26,8 +26,8 @@ from pyglet import gl
 # 	Between block and goal:
 # 		delta distance between prev timestep and cur timestep to encourage larger positive movements
 # 		negative reward based on distance between block and goal 
-#	Reward of ** for moving a block in place (negative reward for moving block out of place)
-# 	Reward of ** for completing puzzle
+#	Reward of 10 for moving a block in place (negative reward for moving block out of place)
+# 	Reward of 10000 for completing puzzle
 #
 # State: 
 # 	For each agent: relative location to block, distance to block, contact with block
