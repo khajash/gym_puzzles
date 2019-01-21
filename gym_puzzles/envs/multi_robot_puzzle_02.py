@@ -12,10 +12,10 @@ from gym.utils import colorize, seeding
 import pyglet
 from pyglet import gl
 
-# This is a 2-D environment in which two octagonal robots (non-holonomic control) move blocks 
-# to a specified location demarcated by a white circle with larger outline representing. 
+# This is a 2-D environment in which two octagonal robots (non-holonomic control) move blocks to a 
+# specified location demarcated by a white circle with larger outline representing the margin of error. 
 # In this current version, there is only a single block initialized, but it has the 
-# capabilites of initializing with 3 blocks
+# capabilites of initializing with 3 blocks that form a square.
 #
 # Actions: Linear velocity and turning angle
 # 
@@ -31,6 +31,8 @@ from pyglet import gl
 # State: 
 # 	For each agent: relative location to block, distance to block, contact with block
 # 	For each block: relative location to goal, distance to goal, global position of block's vertices 
+#
+# TODO: Finish building implementation for multiple blocks. 
 #
 # Created by Kate Hajash
 
@@ -127,9 +129,9 @@ class MultiRobotPuzzle2(gym.Env):
 
 	unitize 	= True
 	contact_weight 	= True # adds agents_in_contact/num_agents weight to puzzle completion
-						   # also adds epsilon number to state info
+				   # also adds epsilon number to state info
 
-	human_vision 	= True # set to False for 
+	human_vision 	= True # set to False for rendering what the agent "sees" - points and vectors
 	heavy		= False
 
 	def __init__(self, frameskip=1, num_agents=2):
@@ -169,11 +171,13 @@ class MultiRobotPuzzle2(gym.Env):
 
 		# DEFINE Observation Boundaries
 		self.theta_threshold = 2*np.pi
-
+		# agent obs - global location and rotation, relative position to goal block, 
+		# linear x and y-velocity, angular velocity, distance to block
 		a_obs = [np.inf, np.inf, self.theta_threshold, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf] * self.num_agents
-
-		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] 
-		vert_obs = [np.inf]*16 # vertices of block
+		# block obs - relative location and rotation to goal position, distance to goal
+		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf]
+		# vertices obs - global location of each vertex of block
+		vert_obs = [np.inf]*16 
 		if self.contact_weight:
 			high = np.array(a_obs + blk_obs + vert_obs + [np.inf])
 		else:
@@ -189,7 +193,6 @@ class MultiRobotPuzzle2(gym.Env):
 		self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
 		self._reset()
-
 
 	def _seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
@@ -306,18 +309,16 @@ class MultiRobotPuzzle2(gym.Env):
 		return goal_dict
 
 	def _generate_blocks(self):
-		
 		self.blocks = []
-
 		for i, block in enumerate(self.block_names):
-			if SIMPLE: x, y = VIEWPORT_W/SCALE/2, VIEWPORT_H/SCALE/2
+			if SIMPLE: 
+				x, y = VIEWPORT_W/SCALE/2, VIEWPORT_H/SCALE/2
 			else:
 				x = np.random.uniform(VIEWPORT_W/SCALE/3+BORDER, VIEWPORT_W/SCALE*2/3-BORDER)
 				y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
 			
 			block = self.world.CreateDynamicBody(
 				position = (x, y),
-				# angle=0, 
 				angle=np.random.uniform(0, 2*np.pi), 
 				linearDamping=LINEAR_DAMP, 
 				angularDamping = ANG_DAMP,
@@ -336,10 +337,8 @@ class MultiRobotPuzzle2(gym.Env):
 					density=self.block_density, 
 					friction=FR, 
 					restitution=RES)
-			
 			self.blocks.append(block)
 
-			print(block.mass)
 			# SAVE vertices data
 			for fix in block.fixtures:
 				if block.userData in self.blks_vertices.keys():
@@ -426,9 +425,8 @@ class MultiRobotPuzzle2(gym.Env):
 		self._generate_blocks()
 		self._generate_agents()
 		self._generate_boundary()
-
 		
-		# RESET goal block
+		# RESET goal block - not necessary
 		self.block_queue = self.block_names.copy()
 		self._set_next_goal_block()
 		self.block_final_pos = self._set_random_goal()
@@ -516,7 +514,7 @@ class MultiRobotPuzzle2(gym.Env):
 			angle = block.angle % (2*np.pi)
 			fx, fy, fangle = self.block_final_pos[block.userData]
 			a_diff = fangle % (2*np.pi) - angle
-			a_diff /= np.pi #normalize
+			a_diff /= np.pi # normalize
 
 			in_place.append(self.is_in_place(x, y, angle, block))
 			
@@ -615,6 +613,7 @@ class MultiRobotPuzzle2(gym.Env):
 		return self.viewer.render(return_rgb_array = mode=='rgb_array')
 
 	def _render_human_vision(self):
+		'''standard rendering style with fills, walls, and vertices'''
 		# DRAW BOUNDARY LINES
 		from gym.envs.classic_control import rendering
 
@@ -662,6 +661,8 @@ class MultiRobotPuzzle2(gym.Env):
 					self.viewer.draw_circle(v_dim, 30, color=cp_color).add_attr(t)
 
 	def _render_agent_vision(self):
+		'''rendering style to display what the agent 'sees' displaying only vertices and vectors'''
+		
 		from gym.envs.classic_control import rendering
 		
 		a_cp_dim 	= 0.03
