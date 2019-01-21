@@ -250,7 +250,6 @@ class MultiRobotPuzzle(gym.Env):
 				box_shape = [1/DS, VIEWPORT_H/SCALE]
 			else:
 				box_shape = [VIEWPORT_W/SCALE, 1/DS]
-
 			wall = self.world.CreateStaticBody(
 				position = (VIEWPORT_W/SCALE*border[0], VIEWPORT_H/SCALE*border[1]),
 				fixtures = fixtureDef(
@@ -265,7 +264,6 @@ class MultiRobotPuzzle(gym.Env):
 			self.block_distance[block.userData] = distance(
 				block.worldCenter*SCALE, 
 				self.block_final_pos[block.userData][:2])
-			
 			fangle = self.block_final_pos[block.userData][2]
 			self.block_angle[block.userData] = abs(fangle %(2*np.pi) - abs(block.angle)%(2*np.pi))
 
@@ -290,9 +288,7 @@ class MultiRobotPuzzle(gym.Env):
 		if self.heavy:
 			scaled = S/2
 			blk_dense = DENSE * 2
-
 		self.blocks = []
-
 		for i, block in enumerate(self.block_names):
 			x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
 			y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
@@ -303,7 +299,6 @@ class MultiRobotPuzzle(gym.Env):
 				angularDamping = DAMP,
 				userData=block
 				)
-			
 			block.agent_contact = False # store for contact listener
 
 			if i == 0: # t_block
@@ -349,12 +344,9 @@ class MultiRobotPuzzle(gym.Env):
 
 	def _generate_agents(self):
 		self.agents = []
-
 		for i in range(self.num_agents):
-
 			x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
 			y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
-
 			agent = self.world.CreateDynamicBody(
 				position = (x, y),
 				fixtures = fixtureDef(
@@ -364,19 +356,15 @@ class MultiRobotPuzzle(gym.Env):
 				angularDamping=DAMP,
 				userData='agent_%s'%i,
 				)
-
 			agent.goal_contact = False # track contact with goal block
-
 			self.agents.append(agent)
 
 	def is_in_place(self, x, y, angle, block):
 		f_x, f_y, f_angle = self.block_final_pos[block.userData]
-
 		if abs(f_x - x) > EPSILON:
 			return False
 		if abs(f_y - y) > EPSILON:
 			return False
-
 		return True
 
 	def _reset(self):
@@ -408,7 +396,6 @@ class MultiRobotPuzzle(gym.Env):
 			# TAKE Action
 			agent.linearVelocity = x * SPEED, y * SPEED
 			agent.angularVelocity = float(turn) # won't take numpy.float32 - needs to be float
-
 			force = 1.1**(-self.agent_dist[agent.userData]) # CHANGE STRENGTH of soft force over time
 			soft_vect = unitVector(agent, self.goal_block)
 			soft_force = (force*soft_vect[0], force*soft_vect[1])
@@ -422,7 +409,7 @@ class MultiRobotPuzzle(gym.Env):
 		prev_agent_dist = self.agent_dist.copy()
 		prev_distance = self.block_distance.copy()
 		prev_angle = self.block_angle.copy()
-
+		
 		self._calculate_distance()
 		self._calculate_agent_distance()
 
@@ -521,9 +508,7 @@ class MultiRobotPuzzle(gym.Env):
 				self.viewer.close()
 				self.viewer = None
 			return
-
 		from gym.envs.classic_control import rendering
-
 		if self.viewer is None:
 			self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
 		self.viewer.set_bounds(0, VIEWPORT_W/SCALE, 0, VIEWPORT_H/SCALE)
