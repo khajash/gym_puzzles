@@ -17,7 +17,7 @@ In this environment, the agents have holonomic control, meaning they can move fr
 ### multi_robot_puzzle_02.py
 In this environment, the agents have non-holonomic control, where agents control their linear velocity and turning radius, similar to a car.
 *MultiRobotPuzzle-v2*
-![Centralized MultiRobot Puzzle 02](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-HumanVision.jpg)
+![Centralized MultiRobot Puzzle 02](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-HumanVision1.jpg)
 
 *MultiRobotPuzzleHeavy-v2*
 ![Centralized MultiRobot Puzzle 02-AgentVision](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-AgentVision.jpg)
