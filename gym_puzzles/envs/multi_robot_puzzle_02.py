@@ -9,23 +9,34 @@ import gym
 from gym import spaces
 from gym.utils import colorize, seeding
 
-# import my_gym
 import pyglet
 from pyglet import gl
 
-# This is an environment in which an octagon robot assembles a simple puzzle
+# This is a 2-D environment in which two octagonal robots (non-holonomic control) move blocks 
+# to a specified location demarcated by a white circle with larger outline representing. 
+# In this current version, there is only a single block initialized, but it has the 
+# capabilites of initializing with 3 blocks
 #
-# Reward: There is a living penalty of -0.05. 
+# Actions: Linear velocity and turning angle
+# 
+# Reward: 
+# 	Between agent and block:
+# 		delta distance between prev timestep and cur timestep to encourage larger positive movements
+# 		negative reward based on distance between agent and block 
+# 	Between block and goal:
+# 		delta distance between prev timestep and cur timestep to encourage larger positive movements
+# 		negative reward based on distance between block and goal 
+# 	Reward for completing puzzle that decays over time encouraging faster completion of task
 #
-# State:
+# State: 
+# 	For each agent: relative location to block, distance to block, contact with block
+# 	For each block: relative location to goal, distance to goal, global position of block's vertices 
 #
-# To solve the game you need to get ?? points in ??? time steps.
-#
-# Created by Kate Hajash.
+# Created by Kate Hajash
 
-FPS    = 50
-SCALE  = 140.0*4   # affects how fast-paced the game is, forces should be adjusted as well
-DS = 1. # downsample
+FPS    	= 50
+SCALE  	= 140.0*4   	# affects how fast-paced the game is, forces should be adjusted as well
+DS 	= 1. 		# downsample
 
 VIEWPORT_W, VIEWPORT_H = int(1440), int(810)
 BORDER 	= 0.3		# border around screen to avoid placing blocks
@@ -33,7 +44,7 @@ BOUNDS 	= 0.1
 
 # ROBOT SETTINGS
 FR 			= 0.01 	# friction (between bodies)
-RES 			= 0.	# restitution (maxes it bounce)
+RES 			= 0.	# restitution (makes it bounce)
 LINEAR_DAMP 		= 5.0
 ANG_DAMP		= 5.0	# damping
 BLK_DENSE 		= 1.56	
@@ -48,25 +59,22 @@ ANG_EPSILON 	= 0.1
 SIMPLE 		= True
 ANYWHERE 	= False
 
-# AGENT
 AGENT_POLY = [
 	(-0.039,-0.095), (0.039,-0.095), (0.095,-0.039), (0.095,0.039), 
 	(0.039,0.095), (-0.039,0.095), (-0.095,0.039), (-0.095,-0.039)
 	]
 
-block_color 	= (0.5, 0.5, 0.5)
-agent_color 	= (1., 1., 1.)
-cp_color 	= (1., 1., 1.)
-final_color 	= (58./255, 153./255, 1)
+grey 	= (0.5, 0.5, 0.5)
+white 	= (1., 1., 1.)
+lt_grey = (0.2, 0.2, 0.2)
 
 COLORS = {
-	'agent'		: agent_color,
-	't_block'	: block_color,
-	'l_block'	: block_color,
-	'i_block'	: block_color,
-	'cp'		: cp_color,
-	'final_pt'	: final_color,
-	'wall'		: (0.2, 0.2, 0.2)
+	'agent'		: white,
+	't_block'	: grey,
+	'l_block'	: grey,
+	'i_block'	: grey,
+	'cp'		: white,
+	'wall'		: lt_grey,
 }
 
 
@@ -75,15 +83,11 @@ class ContactDetector(contactListener):
 		contactListener.__init__(self)
 		self.env = env
 	def BeginContact(self, contact):
-		# if block and agent in touch
 		for agent in self.env.agents:
 			if agent in [contact.fixtureA.body, contact.fixtureB.body]:
 				if self.env.goal_block in [contact.fixtureA.body, contact.fixtureB.body]:
 					agent.goal_contact = True
-					# print("block and agent in contact!")
-				# print([contact.fixtureA.body.userData, contact.fixtureB.body.userData])
 				if 'wall' in [contact.fixtureA.body.userData, contact.fixtureB.body.userData]:
-					# print("env in contact with wall")
 					self.env.wall_contact = True
 	def EndContact(self, contact):
 		for agent in self.env.agents:
@@ -121,12 +125,12 @@ class MultiRobotPuzzle2(gym.Env):
 		'video.frames_per_second' : FPS
 	}
 
-	unitize 		= True
+	unitize 	= True
 	contact_weight 	= True # adds agents_in_contact/num_agents weight to puzzle completion
 						   # also adds epsilon number to state info
 
-	human_vision 	= False
-	heavy			= False
+	human_vision 	= True # set to False for 
+	heavy		= False
 
 	def __init__(self, frameskip=1, num_agents=2):
 		"""
@@ -142,7 +146,7 @@ class MultiRobotPuzzle2(gym.Env):
 
 		self.num_agents = num_agents
 		self.agents = None
-		self.block_names = ['t_block'] # 'l_block', 'i_block']
+		self.block_names = ['t_block'] 
 		self.blocks = None
 		self.block_queue = self.block_names.copy()
 		self.goal_block = None
@@ -167,12 +171,9 @@ class MultiRobotPuzzle2(gym.Env):
 		self.theta_threshold = 2*np.pi
 
 		a_obs = [np.inf, np.inf, self.theta_threshold, np.inf, np.inf, np.inf, np.inf, np.inf, np.inf] * self.num_agents
-		# a_obs = [np.inf, np.inf, self.theta_threshold, np.inf, np.inf, np.inf] * self.num_agents
 
-		# a_obs = [np.inf, np.inf, np.inf, np.inf] * self.num_agents
-		# Global location and rotation (3), relative location (2), distance to block, contact 
-		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] # Block 1 (rel location, rel theta, distance)
-		vert_obs = [np.inf]*16
+		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] 
+		vert_obs = [np.inf]*16 # vertices of block
 		if self.contact_weight:
 			high = np.array(a_obs + blk_obs + vert_obs + [np.inf])
 		else:
@@ -293,19 +294,14 @@ class MultiRobotPuzzle2(gym.Env):
 			if block.userData == self.block_queue[0]:
 				self.block_queue.pop(0)
 				self.goal_block = block
-				# print("goal block: %s" % self.goal_block.userData)
 
 	def _set_random_goal(self):
 		goal_dict = {}
 		if SIMPLE: BORDER = 0.4
 		else: BORDER = 0.3
-		# print(self.norm_units((VIEWPORT_W/SCALE*2/3+BORDER, VIEWPORT_W/SCALE-BORDER)))
 		x = np.random.uniform(VIEWPORT_W/SCALE*2/3+BORDER, VIEWPORT_W/SCALE-BORDER)
 		y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
-		# print("norm units")
 		x, y = self.norm_units((x,y))
-		# print(x, y)
-
 		goal_dict[self.goal_block.userData] = (x, y, 0)
 		return goal_dict
 
@@ -327,7 +323,6 @@ class MultiRobotPuzzle2(gym.Env):
 				angularDamping = ANG_DAMP,
 				userData=block
 				)
-			# print("block starting position: %s" % block.position)
 			block.agent_contact = False # store for contact
 
 			if i == 0: # t_block
@@ -355,7 +350,6 @@ class MultiRobotPuzzle2(gym.Env):
 
 	def _generate_agents(self):
 		self.agents = []
-
 		for i in range(self.num_agents):
 			if ANYWHERE:
 				x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
@@ -393,7 +387,7 @@ class MultiRobotPuzzle2(gym.Env):
 				userData='agent_%s'%i,
 				)
 
-			agent.goal_contact = False # Track contact with goal block
+			agent.goal_contact = False # track contact with goal block
 			self.agents.append(agent)
 
 	def _generate_boundary(self):
@@ -404,7 +398,6 @@ class MultiRobotPuzzle2(gym.Env):
 				box_shape = [BOUNDS, VIEWPORT_H/SCALE]
 			else:
 				box_shape = [VIEWPORT_W/SCALE, BOUNDS]
-
 			wall = self.world.CreateStaticBody(
 				position=(
 					VIEWPORT_W/SCALE*border[0], 
@@ -417,23 +410,11 @@ class MultiRobotPuzzle2(gym.Env):
 			self.boundary.append(wall)
 
 	def is_in_place(self, x, y, angle, block):
-		
-		f_x, f_y, f_angle = self.block_final_pos[block.userData] # UNITIZED
-		# print('is_in_place:')
-		# print("final_position:", f_x, f_y, f_angle)
-		# print("current_loc:", x, y, angle)
-
+		f_x, f_y, f_angle = self.block_final_pos[block.userData] 
 		if abs(f_x - x) > self.scaled_epsilon:
 			return False
 		if abs(f_y - y) > self.scaled_epsilon:
 			return False
-		# if block.userData == 'i_block':
-		# 	diff = abs(f_angle-angle) % np.pi
-		# 	if  diff > ANG_EPSILON:
-		# 		return False
-		# elif abs(f_angle-angle) > ANG_EPSILON:
-		# 	return False
-
 		return True
 
 	def _reset(self):
@@ -455,21 +436,15 @@ class MultiRobotPuzzle2(gym.Env):
 		self._calculate_distance()
 		self._calculate_agent_distance()
 		self.done_status = None
-		# self._reset_params()
 
 		self.drawlist = self.boundary + self.blocks + self.agents
 
 		return self._step(self.action_space.sample())[0]
 
 	def _step(self, action):
-		# print(action)
-		# CHOOSE Action 
+		# CHOOSE action for each agent
 		for i, agent in enumerate(self.agents):
 			turn, vel = action[0 + i*2], action[1 + i*2]
-
-			# print("%s: turn: %s vel: %s" % (agent.userData, turn, vel))
-			# x, y = self.norm_units(agent.worldCenter)
-			# print(agent.userData, self.norm_units(agent.worldCenter))
 
 			f = agent.GetWorldVector(localVector=(0.0, 1.0))
 			p = agent.GetWorldPoint(localPoint=(0.0, 2.0)) # change apply point?
@@ -479,36 +454,26 @@ class MultiRobotPuzzle2(gym.Env):
 			agent.ApplyForce(f, p, True)
 			updateFriction(agent)
 			agent.ApplyAngularImpulse( 0.1 * agent.inertia * agent.angularVelocity, True )
-			# agent.ApplyTorque(turn, True)
-			# print(agent)
 
 			max_torque = 0.0005
-			# # print(turn)
 			torque = abs(turn)*max_torque
-			# print(torque)
 			if abs(vel) < 0.1: turn = 0
 
 			if turn < 0:
 				agent.ApplyTorque(torque, True)
-				# print(torque, "apply left torque")
 			elif turn > 0:
 				agent.ApplyTorque(-torque, True)
-				# print(torque, "apply right torque")
-
 			else:
 				agent.ApplyTorque(0, True)
-				# print("apply ZERO torque")	
 
 			# APPLY soft force
 			force = 10**(-self.agent_dist[agent.userData]) # CHANGE STRENGTH of soft force over time
-			# force2 = 1.1**(-self.agent_dist[agent.userData]) # CHANGE STRENGTH of soft force over time
 			force /= 50
 			soft_vect = unitVector(agent, self.goal_block)
-			# print(self.goal_block.worldCenter)
 			soft_force = (force*soft_vect[0], force*soft_vect[1])
 			self.goal_block.ApplyForce(soft_force, self.goal_block.worldCenter, True)
 		
-		# PROGRESS multiple timesteps:
+		# PROGRESS timesteps (1 if low-dim or set-rate for high-dim) 
 		for _ in range(self.frameskip):
 			self.world.Step(1.0/FPS, 6*30, 2*30)
 
@@ -520,7 +485,6 @@ class MultiRobotPuzzle2(gym.Env):
 		self._calculate_distance()
 		self._calculate_agent_distance()
 
-		# RETRIEVE Block locations + SET STATE
 		in_place = []
 		in_contact = False
 
@@ -528,7 +492,6 @@ class MultiRobotPuzzle2(gym.Env):
 		self.state = []
 
 		for agent in self.agents:
-
 			# ADD global location	
 			aX, aY = self.norm_units(agent.worldCenter)
 			self.state.extend([
@@ -536,28 +499,22 @@ class MultiRobotPuzzle2(gym.Env):
 				aY, 
 				self.norm_angle(agent.angle), 
 				])
-
 			# ADD location relative to goal block 
 			bX, bY = self.norm_units(self.goal_block.worldCenter)
 			self.state.extend([
 				aX - bX, 
 				aY - bY,
 				])
-
 			vX, vY = agent.linearVelocity
 			self.state.extend([vX, vY, agent.angularVelocity])
-
 			self.state.append(self.agent_dist[agent.userData])
 		
 
 		for block in self.blocks:
 			# CALCULATE relative location 
-			# TODO: LOOK INTO ANGLE
-			x, y = self.norm_units(block.worldCenter) # is actual world center - unscaled
+			x, y = self.norm_units(block.worldCenter)
 			angle = block.angle % (2*np.pi)
 			fx, fy, fangle = self.block_final_pos[block.userData]
-			# print("final location: ", fx, fy)
-			# print(x-fx, y-fy)
 			a_diff = fangle % (2*np.pi) - angle
 			a_diff /= np.pi #normalize
 
@@ -574,25 +531,20 @@ class MultiRobotPuzzle2(gym.Env):
 		if self.contact_weight:
 			self.state.append(self.scaled_epsilon)
 
-
-
 		# CALCULATE rewards
 		reward = 0
 
-		# DISTANCE of BLOCK 
+		# DISTANCE of block to goal - delta distance and overall distance 
 		deltaDist = prev_distance[self.goal_block.userData] - self.block_distance[self.goal_block.userData]
 		reward += deltaDist * self.weight_deltaBlock
 		reward -= self.weight_blk_dist * self.block_distance[self.goal_block.userData]
 		
-		# DISTANCE PENALTY
+		# DISTANCE of agent to block - delta distance and overall distance
 		for agent in self.agents:
-			# DISTANCE OF AGENT
 			deltaAgent = prev_agent_dist[agent.userData] - self.agent_dist[agent.userData]
-			# print("%s's deltadistance: %s" % (agent.userData, deltaAgent*100)) # <0.05
 			reward += deltaAgent*self.weight_deltaAgent
 			reward -= self.weight_agent_dist * self.agent_dist[agent.userData]
-			# reward -= self.agent_dist[agent.userData]
-			# print("distance reward: ", self.agent_dist[agent.userData])
+
 
 		# CHECK if DONE
 		done = False
@@ -600,14 +552,12 @@ class MultiRobotPuzzle2(gym.Env):
 		if self._agt_out_of_bounds():
 			done = True
 			reward -= self.shaped_bounds_penalty
-			# print("LOSER!!!", reward)
 			self.done_status = "FAIL! Agent Out Of Bounds: %s" % reward
 			return np.array(self.state), reward, done, {}
 
 		if self._blk_out_of_bounds():
 			done = True
 			reward -= self.shaped_blk_bounds_penalty
-			# print("Nice Try!!!", reward)
 			self.done_status = "Nice Try! Block Out Of Bounds: %s" % reward
 			return np.array(self.state), reward, done, {}
 			
@@ -618,32 +568,19 @@ class MultiRobotPuzzle2(gym.Env):
 			if complete == True:
 				self.blks_in_place += 1
 
-		# ASSIGN new reward
-		# reward += (self.blks_in_place-self.prev_blks_in_place) * BLOCK_REWARD 
-			# -10 for moving a block out of place
-			# +10 for moving a block in place
-			# intended to avoid robot moving a block in and out of place to take get continuous reward
 		num_in_contact = 0
 		for agent in self.agents:
 			if agent.goal_contact: num_in_contact +=1
 
-
-		# print("agents in contact")
-		# print(num_in_contact/len(self.agents))
-
 		if self.blks_in_place == 1:
 			done = True
-			# reward += self.puzzle_complete_reward
 			if self.contact_weight:
 				reward += self.shaped_puzzle_reward * (num_in_contact/len(self.agents))
 			else:
 				reward += self.shaped_puzzle_reward
-			# print("puzzle complete!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
 			self.done_status = "\nPuzzle Complete!!!!!!!!!!!!!!!!!!!!!!!!!\n%s" % reward
 			return np.array(self.state), reward, done, {}
 
-		# print("state: ", self.state)
-		# print("total reward: ", reward)
 		return np.array(self.state), reward, done, {}
 
 	def _return_status(self):
@@ -651,7 +588,6 @@ class MultiRobotPuzzle2(gym.Env):
 		else: return "Stayed in bounds"
 
 	def _render(self, mode='human', close=False):
-		
 		if close:
 			if self.viewer is not None:
 				self.viewer.close()
@@ -659,60 +595,28 @@ class MultiRobotPuzzle2(gym.Env):
 			return
 
 		from gym.envs.classic_control import rendering
-
+		
 		if self.viewer is None:
 			self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
 		self.viewer.set_bounds(0, VIEWPORT_W/SCALE, 0, VIEWPORT_H/SCALE)
 
 		# DRAW BACKGROUND
 		self.viewer.draw_polygon( [
-			(0,					0),
+			(0,			0),
 			(VIEWPORT_W/SCALE,	0),
 			(VIEWPORT_W/SCALE,	VIEWPORT_H/SCALE),
-			(0, 				VIEWPORT_H/SCALE),
+			(0, 			VIEWPORT_H/SCALE),
 			], color=(0., 0., 0.) )
 
 		if self.human_vision:
 			self._render_human_vision()
 		else:
 			self._render_agent_vision()
-		
 		return self.viewer.render(return_rgb_array = mode=='rgb_array')
 
 	def _render_human_vision(self):
 		# DRAW BOUNDARY LINES
 		from gym.envs.classic_control import rendering
-
-		# self.viewer.draw_polyline( [
-		# 	(BOUNDS,					BOUNDS),
-		# 	(VIEWPORT_W/SCALE - BOUNDS,	BOUNDS),
-		# 	(VIEWPORT_W/SCALE - BOUNDS,	VIEWPORT_H/SCALE - BOUNDS),
-		# 	(BOUNDS,					VIEWPORT_H/SCALE - BOUNDS),
-		# 	(BOUNDS,					BOUNDS),
-		# 	], color=(.75, 0., 0.,),
-		# 	linewidth=5)
-
-		# bound_color = (0.2, 0.2, 0.2)
-		# self.viewer.draw_polyline( [
-		# 	(BORDER,					BORDER),
-		# 	(VIEWPORT_W/SCALE - BORDER,	BORDER),
-		# 	(VIEWPORT_W/SCALE - BORDER,	VIEWPORT_H/SCALE - BORDER),
-		# 	(BORDER,					VIEWPORT_H/SCALE - BORDER),
-		# 	(BORDER,					BORDER),
-		# 	], color=bound_color,
-		# 	linewidth=3)
-
-		# self.viewer.draw_polyline( [ 
-		# 	(VIEWPORT_W/SCALE/3, BORDER),
-		# 	(VIEWPORT_W/SCALE/3, VIEWPORT_H/SCALE - BORDER),
-		# 	], color=bound_color,
-		# 	linewidth=3)
-
-		# self.viewer.draw_polyline( [ 
-		# 	(VIEWPORT_W/SCALE*2/3, BORDER),
-		# 	(VIEWPORT_W/SCALE*2/3, VIEWPORT_H/SCALE - BORDER),
-		# 	], color=bound_color,
-		# 	linewidth=3)
 
 		a_cp_dim 	= 0.03/2
 		v_dim 		= 0.015/2
@@ -727,16 +631,12 @@ class MultiRobotPuzzle2(gym.Env):
 			t = rendering.Transform(translation=(fx, fy))
 			self.viewer.draw_circle(v_dim, 100, color=white).add_attr(t)
 			self.viewer.draw_circle(self.scaled_epsilon/RATIO, 30, color=dark_grey, linewidth=thick_line, filled=False).add_attr(t)
-			# self.viewer.draw_circle(self.scaled_epsilon/RATIO, 30, color=final_color).add_attr(t)
 
 		# DRAW OBJECTS
 		for obj in self.drawlist:
-			
-			# print(obj.userData)
 			for f in obj.fixtures:
 				trans = f.body.transform
 				path = [trans*v for v in f.shape.vertices]
-
 				if 'agent' in obj.userData:
 					if 'wheel' in f.userData:
 						self.viewer.draw_polygon(path, color=block_color)
@@ -745,26 +645,21 @@ class MultiRobotPuzzle2(gym.Env):
 				else:
 					self.viewer.draw_polygon(path, color=COLORS[obj.userData])
 			
-			# DRAW CP
+			# DRAW agent cp
 			if 'agent' in obj.userData:
 				x, y = obj.position
-				# print('position: ', obj.position)
-				# print('position: ', obj.worldCenter)
 				t = rendering.Transform(translation=(x, y))
 				self.viewer.draw_circle(a_cp_dim, 30, color=block_color).add_attr(t)
-
+			
+			# DRAW block cp + vertices
 			if 'block' in obj.userData:
 				x, y = obj.worldCenter
-				# print("world center: ", x, y)
-				# print("local center: ", obj.localCenter)
 				t = rendering.Transform(translation=(x, y))
 				self.viewer.draw_circle(a_cp_dim, 30, color=cp_color).add_attr(t)
 				for v in self.blks_vertices[obj.userData]:
 					x, y = obj.GetWorldPoint(v)
 					t = rendering.Transform(translation=(x, y))
 					self.viewer.draw_circle(v_dim, 30, color=cp_color).add_attr(t)
-
-
 
 	def _render_agent_vision(self):
 		from gym.envs.classic_control import rendering
@@ -787,19 +682,17 @@ class MultiRobotPuzzle2(gym.Env):
 
 		# DRAW OBJECTS
 		for obj in self.drawlist:
-			
-			# DRAW CP
+			# DRAW agent cp, pointer, distance btwn agent and block
 			if 'agent' in obj.userData:
 				x, y = obj.position
-
 				t = rendering.Transform(translation=(x, y))
 				self.viewer.draw_circle(a_cp_dim, 30, color=white).add_attr(t)
-				# Draw pointer
 				vx, vy = obj.GetWorldVector(localVector=(0,0.1))
 				self.viewer.draw_polyline([(x, y), (x+vx, y+vy)], color=white, linewidth=thin_line)
 				if by!=0 and bx!=0:
 					self.viewer.draw_polyline([(x, y), (bx, by)], color=white, linewidth=thin_line).add_attr(dash)
-
+			
+			# DRAW block cp, distance btwn block and goal, vertices
 			if 'block' in obj.userData:
 				bx, by = obj.worldCenter
 				t = rendering.Transform(translation=(bx, by))
@@ -813,33 +706,12 @@ class MultiRobotPuzzle2(gym.Env):
 ####################################################################################################################
 
 class MultiRobotPuzzleHeavy2(MultiRobotPuzzle2):
-	heavy = True
+	heavy = True # heavy block - more difficult to move
 
-
+	
 ####################################################################################################################
 # Testing Environements
 ####################################################################################################################
-
-def run_random_actions():
-	env.reset()
-	print("completed reset")
-	reward_sum = 0
-	num_games = 1
-	num_game = 0
-	while num_game < num_games:
-		env.render()
-		observation, reward, done, _ = env.step(env.action_space.sample())
-		reward_sum += reward
-		# print(reward_sum)
-		if done:
-			print("Reward for this episode was: {}".format(reward_sum))
-			reward_sum = 0
-			num_game += 1
-			env.reset()
-		if escape: break
-
-	env.render(close=True)
-
 
 if __name__=="__main__":
 	
@@ -856,39 +728,29 @@ if __name__=="__main__":
 		if k==key.RIGHT	and a[0] < +1.0:	a[0] += 0.1
 		if k==key.UP   and a[1] < +1.0:		a[1] += 0.1
 		if k==key.DOWN	and a[1] > -1.0:	a[1] -= 0.1
-		if k==key.SPACE: 					a[0], a[1] = 0, 0 
+		if k==key.SPACE: 			a[0], a[1] = 0, 0 
 
-
-
-	# env = gym.make("MultiRobotPuzzle-v0")
 	env = MultiRobotPuzzle2()
 	print(type(env))
-	# env.render()
 	env._reset()
 	env._render()
 
 	env.viewer.window.on_key_press = key_press
-	# env.viewer.window.on_key_release = key_release
-
 	
-	print("completed reset")
 	reward_sum = 0
 	num_games = 10
 	num_game = 0
 	while num_game < num_games:
 		env._render()
-		# print(env.render(mode="rgb_array").shape)
-		observation, reward, done, _ = env._step(a)
-		# print(observation.shape)
+# 		observation, reward, done, _ = env.step(env.action_space.sample()) # random sample
+		observation, reward, done, _ = env._step(a) # keyboard control
 		reward_sum += reward
-		# print(reward_sum)
 		if done:
 			print("Reward for this episode was: {}".format(reward_sum))
 			reward_sum = 0
 			num_game += 1
 			env._reset()
 		if escape: break
-
 
 	env.render(close=True)
 	
