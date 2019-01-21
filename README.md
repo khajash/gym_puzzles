@@ -12,6 +12,6 @@ In this environment, the agents have holonomic control, meaning they can move fr
 
 ![Centralized MultiRobot Puzzle 00 Heavy](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP0-Heavy.jpg)
 
-![Centralized MultiRobot Puzzle 02](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-HumanVision.jpg)
+![Centralized MultiRobot Puzzle 02](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-HumanVision1.jpg)
 
 ![Centralized MultiRobot Puzzle 02-AgentVision](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-AgentVision.jpg)
