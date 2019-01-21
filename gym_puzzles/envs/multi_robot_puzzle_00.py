@@ -49,9 +49,14 @@ DAMP 	= 5.0		# damping
 DENSE 	= 5.0		# density of blocks
 SPEED 	= 10/SCALE*4	# speed of robot agent
 
+
 # PRECISION FOR BLOCKS IN PLACE
-EPSILON = 25.0/DS
-ANG_EPSILON = 0.1
+EPSILON 	= 25.0/DS
+ANG_EPSILON 	= 0.1
+
+# FIXED REWARDS
+BLOCK_REWARD 	= 10
+FINAL_REWARD	= 10000
 
 # AGENT
 S = 2*DS 		# scale of agents and blocks
