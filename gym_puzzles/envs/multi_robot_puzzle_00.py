@@ -14,17 +14,26 @@ import pyglet
 from pyglet import gl
 
 # This is a 2-D environment in which two octagonal robots (holonomic control) moves blocks 
-# to a specified location demarcated by a blue circle. 
+# to a specified location demarcated by a blue circle. In this current version, there is only a single 
+# block initialized, but it has the capabilites of initializing with 3 blocks
 #
 # Actions: Linear velocity in x and y-dimensions and angular velocity
 # 
 # Reward: 
+# 	Between agent and block:
+# 		delta distance between prev timestep and cur timestep to encourage larger positive movements
+# 		negative reward based on distance between agent and block 
+# 	Between block and goal:
+# 		delta distance between prev timestep and cur timestep to encourage larger positive movements
+# 		negative reward based on distance between block and goal 
+#	Reward of ** for moving a block in place (negative reward for moving block out of place)
+# 	Reward of ** for completing puzzle
 #
 # State: 
 # 	For each agent: relative location to block, distance to block, contact with block
 # 	For each block: relative location to goal, distance to goal, global position of block's vertices 
 #
-# Created by Kate Hajash.
+# Created by Kate Hajash
 
 DS 	= 1. 		# downsample
 FPS     = 50 		# smaller number is faster, larger number is slower
@@ -111,7 +120,6 @@ def set_final_loc(screen_wd, screen_ht, block_rel_dict):
 			screen_x + rel_loc[0][0]*SCALE, # adjust x, y to screen
 			screen_y + rel_loc[0][1]*SCALE, 
 			rel_loc[1])
-
 	return puzzle_abs_loc
 
 def distance(pt1, pt2):
@@ -131,7 +139,6 @@ class MultiRobotPuzzle(gym.Env):
 		'render.modes': ['human', 'rgb_array', 'state_pixels'],
 		'video.frames_per_second' : FPS
 	}
-
 	downsample = 2 # for paperspace w/ lowres screen
 	obs_type = 'low-dim'
 	heavy = False
