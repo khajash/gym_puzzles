@@ -300,6 +300,9 @@ class MultiRobotPuzzle(gym.Env):
 		if self.heavy:
 			scaled = S/2
 			blk_dense = DENSE * 2
+		else:
+			scaled = S
+			blk_dense = DENSE
 		self.blocks = []
 		for i, block in enumerate(self.block_names):
 			x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
