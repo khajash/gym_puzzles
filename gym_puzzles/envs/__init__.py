@@ -1,2 +1,2 @@
-from my_gym.envs.multi_robot_puzzle_00 import MultiRobotPuzzle, MultiRobotPuzzleHeavy
-from my_gym.envs.multi_robot_puzzle_02 import MultiRobotPuzzle2, MultiRobotPuzzleHeavy2
+from gym_puzzles.envs.multi_robot_puzzle_00 import MultiRobotPuzzle, MultiRobotPuzzleHeavy
+from gym_puzzles.envs.multi_robot_puzzle_02 import MultiRobotPuzzle2, MultiRobotPuzzleHeavy2

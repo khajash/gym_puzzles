@@ -1,6 +1,6 @@
-import sys, math
+# import sys, math
 import numpy as np
-from scipy import misc
+# from scipy import misc
 
 import Box2D
 from Box2D.b2 import (polygonShape, circleShape, staticBody, dynamicBody, vec2, fixtureDef, contactListener)
@@ -9,7 +9,7 @@ import gym
 from gym import spaces
 from gym.utils import colorize, seeding
 
-import my_gym
+# import gym_puzzles
 import pyglet
 from pyglet import gl
 
@@ -35,7 +35,7 @@ from pyglet import gl
 #
 # Created by Kate Hajash
 
-DS 	= 1. 		# downsample
+DS 	= 1. 			# downsample
 FPS     = 50 		# smaller number is faster, larger number is slower
 SCALE   = 30.0   	# affects how fast-paced the game is, forces should be adjusted as well
 
@@ -206,7 +206,10 @@ class MultiRobotPuzzle(gym.Env):
 		action_high = np.array([1] * (3 * self.num_agents))
 		self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
-		self._reset()
+		self.reset()
+
+	def seed(self, seed=None):
+		return self._seed(seed)
 
 	def _seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
@@ -381,8 +384,12 @@ class MultiRobotPuzzle(gym.Env):
 		if abs(f_y - y) > EPSILON:
 			return False
 		return True
+	
+	# def reset(self, **kwargs):
+	# 	return self._reset()
 
-	def _reset(self):
+
+	def reset(self):
 		self._destroy()
 		self.world.contactListener_bug_workaround = ContactDetector(self)
 		self.world.contactListener = self.world.contactListener_bug_workaround
@@ -401,9 +408,9 @@ class MultiRobotPuzzle(gym.Env):
 
 		self.drawlist = self.boundary + self.blocks + self.agents
 
-		return self._step(self.action_space.sample())[0]
+		return self.step(self.action_space.sample())[0]
 
-	def _step(self, action):
+	def step(self, action):
 		# CHOOSE Action 
 		for i, agent in enumerate(self.agents):
 			x, y, turn = action[0 + i*3], action[1 + i*3], action[2 + i*3]
@@ -517,7 +524,8 @@ class MultiRobotPuzzle(gym.Env):
 		if self.done_status: return self.done_status
 		else: return "Stayed in bounds"
 
-	def _render(self, mode='human', close=False):
+	
+	def render(self, mode='human', close=False):
 		if close:
 			if self.viewer is not None:
 				self.viewer.close()
@@ -564,22 +572,22 @@ class MultiRobotPuzzle(gym.Env):
 			if 'agent' in obj.userData:
 				x, y = obj.position
 				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(lg_d, 30, color=block_color).add_attr(t)
+				self.viewer.draw_circle(lg_d, 30, color=COLORS['i_block']).add_attr(t)
 
 			# DRAW BLOCK + VERTICES
 			if 'block' in obj.userData:
 				x, y = obj.worldCenter
 				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(lg_d, 30, color=cp_color).add_attr(t)
+				self.viewer.draw_circle(lg_d, 30, color=COLORS['cp']).add_attr(t)
 				for v in self.blks_vertices[obj.userData]:
 					x, y = obj.GetWorldPoint(v)
 					t = rendering.Transform(translation=(x, y))
-					self.viewer.draw_circle(sm_d, 30, color=cp_color).add_attr(t)
+					self.viewer.draw_circle(sm_d, 30, color=COLORS['cp']).add_attr(t)
 
 		# DRAW FINAL POINTS
 		for f_loc in self.block_final_pos.values():
 			t = rendering.Transform(translation=(f_loc[0]/SCALE, f_loc[1]/SCALE))
-			self.viewer.draw_circle(EPSILON/SCALE, 30, color=final_color).add_attr(t)
+			self.viewer.draw_circle(EPSILON/SCALE, 30, color=COLORS['final_pt']).add_attr(t)
 
 		return self.viewer.render(return_rgb_array = mode=='rgb_array')
 
@@ -624,15 +632,15 @@ if __name__=="__main__":
 		if k==key.SPACE: 			a[0], a[1] = 0, 0 
 
 	env = MultiRobotPuzzle()
-	env._render()
-	env._reset()
+	env.render()
+	env.reset()
 	env.viewer.window.on_key_press = key_press
 	
 	reward_sum = 0
 	num_games = 10
 	num_game = 0
 	while num_game < num_games:
-		env._render()
+		env.render()
 		# observation, reward, done, _ = env.step(env.action_space.sample()) # random control
 		observation, reward, done, _ = env._step(a) # keyboard control
 		reward_sum += reward

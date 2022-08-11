@@ -1,6 +1,6 @@
-import sys, math
+# import sys, math
 import numpy as np
-from scipy import misc
+# from scipy import misc
 
 import Box2D
 from Box2D.b2 import (polygonShape, circleShape, staticBody, dynamicBody, vec2, fixtureDef, contactListener, dot)
@@ -45,9 +45,9 @@ BORDER 	= 0.3		# border around screen to avoid placing blocks
 BOUNDS 	= 0.1
 
 # ROBOT SETTINGS
-FR 			= 0.01 	# friction (between bodies)
+FR 				= 0.01 	# friction (between bodies)
 RES 			= 0.	# restitution (makes it bounce)
-LINEAR_DAMP 		= 5.0
+LINEAR_DAMP 	= 5.0
 ANG_DAMP		= 5.0	# damping
 BLK_DENSE 		= 1.56	
 AGT_DENSE 		= 17.3	# density of blocks
@@ -69,6 +69,7 @@ AGENT_POLY = [
 grey 	= (0.5, 0.5, 0.5)
 white 	= (1., 1., 1.)
 lt_grey = (0.2, 0.2, 0.2)
+blue 	= (58./255, 153./255, 1.)
 
 COLORS = {
 	'agent'		: white,
@@ -76,6 +77,7 @@ COLORS = {
 	'l_block'	: grey,
 	'i_block'	: grey,
 	'cp'		: white,
+	'final_pt'	: blue,
 	'wall'		: lt_grey,
 }
 
@@ -140,7 +142,7 @@ class MultiRobotPuzzle2(gym.Env):
 		Observation type: 'image' or 'low-dim'
 		observation depth: integer indicating how many images should be part of observation
 		"""
-		self._seed()
+		self.seed()
 		self.viewer = None
 		self.frameskip = frameskip
 
@@ -192,9 +194,9 @@ class MultiRobotPuzzle2(gym.Env):
 		action_high = np.array([1] * (2 * self.num_agents))
 		self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
-		self._reset()
+		self.reset()
 
-	def _seed(self, seed=None):
+	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
 		return [seed]
 
@@ -416,7 +418,7 @@ class MultiRobotPuzzle2(gym.Env):
 			return False
 		return True
 
-	def _reset(self):
+	def reset(self):
 		self._destroy()
 		self.world.contactListener_bug_workaround = ContactDetector(self)
 		self.world.contactListener = self.world.contactListener_bug_workaround
@@ -437,9 +439,9 @@ class MultiRobotPuzzle2(gym.Env):
 
 		self.drawlist = self.boundary + self.blocks + self.agents
 
-		return self._step(self.action_space.sample())[0]
+		return self.step(self.action_space.sample())[0]
 
-	def _step(self, action):
+	def step(self, action):
 		# CHOOSE action for each agent
 		for i, agent in enumerate(self.agents):
 			turn, vel = action[0 + i*2], action[1 + i*2]
@@ -585,7 +587,7 @@ class MultiRobotPuzzle2(gym.Env):
 		if self.done_status: return self.done_status
 		else: return "Stayed in bounds"
 
-	def _render(self, mode='human', close=False):
+	def render(self, mode='human', close=False):
 		if close:
 			if self.viewer is not None:
 				self.viewer.close()
@@ -638,7 +640,7 @@ class MultiRobotPuzzle2(gym.Env):
 				path = [trans*v for v in f.shape.vertices]
 				if 'agent' in obj.userData:
 					if 'wheel' in f.userData:
-						self.viewer.draw_polygon(path, color=block_color)
+						self.viewer.draw_polygon(path, color=grey)
 					else:
 						self.viewer.draw_polygon(path, color=COLORS['agent'])
 				else:
@@ -648,17 +650,17 @@ class MultiRobotPuzzle2(gym.Env):
 			if 'agent' in obj.userData:
 				x, y = obj.position
 				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(a_cp_dim, 30, color=block_color).add_attr(t)
+				self.viewer.draw_circle(a_cp_dim, 30, color=COLORS['i_block']).add_attr(t)
 			
 			# DRAW block cp + vertices
 			if 'block' in obj.userData:
 				x, y = obj.worldCenter
 				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(a_cp_dim, 30, color=cp_color).add_attr(t)
+				self.viewer.draw_circle(a_cp_dim, 30, color=white).add_attr(t)
 				for v in self.blks_vertices[obj.userData]:
 					x, y = obj.GetWorldPoint(v)
 					t = rendering.Transform(translation=(x, y))
-					self.viewer.draw_circle(v_dim, 30, color=cp_color).add_attr(t)
+					self.viewer.draw_circle(v_dim, 30, color=white).add_attr(t)
 
 	def _render_agent_vision(self):
 		'''rendering style to display what the agent 'sees' displaying only vertices and vectors'''
@@ -697,12 +699,12 @@ class MultiRobotPuzzle2(gym.Env):
 			if 'block' in obj.userData:
 				bx, by = obj.worldCenter
 				t = rendering.Transform(translation=(bx, by))
-				self.viewer.draw_circle(v_dim, 30, color=cp_color).add_attr(t)
+				self.viewer.draw_circle(v_dim, 30, color=COLORS['cp']).add_attr(t)
 				self.viewer.draw_polyline([(bx, by), (fx, fy)], color=white, linewidth=thin_line).add_attr(dash)
 				for v in self.blks_vertices[obj.userData]:
 					x, y = obj.GetWorldPoint(v)
 					t = rendering.Transform(translation=(x, y))
-					self.viewer.draw_circle(v_dim, 30, color=cp_color).add_attr(t)
+					self.viewer.draw_circle(v_dim, 30, color=COLORS['cp']).add_attr(t)
 
 ####################################################################################################################
 

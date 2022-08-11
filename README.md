@@ -1,42 +1,56 @@
-# gym_puzzles
+# OpenAI Gym Puzzles
 
-This repository contains custom environments following the OpenAI Gym structure. Each environment contains multiple agents (although they are all centrally controlled by the same algorithm with the same observation and reward), whose goal is to move the T-shaped block to the goal location, marked by a circle. 
+This repository contains custom OpenAI Gym environments using PyBox2D. Each environment contains multiple robots which are centrally controlled by a single agent, whose goal is to move the T-shaped block to the goal location, marked by a blue circle. For true mutli-agent environments check out [multiagent-env](https://github.com/khajash/multiagent-env).
 
-By adding this repository to your OpenAI Gym folder, you can simply use `gym.make("MultiRobotPuzzle-v0")` to call the environment. Environment names are:
-- MultiRobotPuzzle-v0
-- MultiRobotPuzzleHeavy-v0
-- MultiRobotPuzzle-v2
-- MultiRobotPuzzleHeavy-v2
+## Setup
 
-### multi_robot_puzzle_00.py
+```
+git clone https://github.com/khajash/gym_puzzles.git
+cd gym_puzzles
+python -m venv .env
+source .env/bin/activate
+pip install -e .
+```
 
-In this environment, the agents have holonomic control, meaning they can move freely in the x and y-dimensions and rotate. 
+## Usage
 
-*MultiRobotPuzzle-v0*
+```
+import gym_puzzles
+env = gym.make('MultiRobotPuzzle-v0')
+```
 
-This env contains 2 agents with a lighter and smaller block than the heavy version.
+## Envs Available
+There are four envs currently configured:
+-  **Holonomic Control**
+    - `MultiRobotPuzzle-v0`
+    - `MultiRobotPuzzleHeavy-v0`
+- **Non-Holonomic Control**
+    - `MultiRobotPuzzle-v2`
+    - `MultiRobotPuzzleHeavy-v2`
 
-![Centralized MultiRobot Puzzle 00](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP0-light.jpg)
+#### `MultiRobotPuzzle-v0` and `MultiRobotPuzzleHeavy-v0`
 
-*MultiRobotPuzzleHeavy-v0*
+In both of these environments, the agents have holonomic control, meaning they can move freely in the x and y-dimensions and rotate. 
+The base version `MultiRobotPuzzle-v0` contains 2 agents with a lighter and smaller block than the heavy version.
 
-This env contains 5 agents with a block that is 2x the size of the block in the normal environment and 2x heavier.
-
-![Centralized MultiRobot Puzzle 00 Heavy](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP0-Heavy.jpg)
+<img src="./imgs/CentralizedMRP0-light.jpg" width="400" >
 
 
-### multi_robot_puzzle_02.py
+The heavy version `MultiRobotPuzzleHeavy-v0` contains 5 agents with a block that is 2x the size of the block in the normal environment and 2x heavier.
 
-In this environment, the agents have non-holonomic control, where agents control their linear velocity and turning radius, similar to a car. 
+<img src="./imgs/CentralizedMRP0-Heavy.jpg" width="400">
 
-*MultiRobotPuzzle-v2 or MultiRobotPuzzleHeavy-v2*
 
-Both the normal and heavy versions have the same size block, but heavy has a density significantly higher making it very difficult to move alone. This image shows the standard human vision rendering style showing solid fills for objects, vertices, and centroids.
+#### `MultiRobotPuzzle-v2` and `MultiRobotPuzzleHeavy-v2`
 
-![Centralized MultiRobot Puzzle 02](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-HumanVision1.jpg)
+In both of these environments, the agents have non-holonomic control, where agents control their linear velocity and turning radius, similar to a car. 
+Both the base and heavy versions have the same size block, but the heavy version has a density significantly higher making it very difficult to move alone. This image shows the standard human vision rendering style showing solid fills for objects, vertices, and centroids.
 
-*Rendering Agent Vision*
+<img src="./imgs/CentralizedMRP1-HumanVision1.jpg" width="400">
+
+***Rendering Agent Vision***
 
 This rendering style is meant to give us an idea of what the agent sees. It only shows centroids, vertices, and vectors. 
 
-![Centralized MultiRobot Puzzle 02-AgentVision](https://github.com/khajash/gym_puzzles/blob/master/EnvImages/CentralizedMRP1-AgentVision.jpg)
+<img src="./imgs/CentralizedMRP1-AgentVision.jpg" width="400">
+
