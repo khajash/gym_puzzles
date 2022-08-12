@@ -15,5 +15,5 @@ setup(
       url="https://github.com/khajash/gym_puzzles",
       author_email="kshajash@gmail.com",
       keywords="reinforcement-learning gym openai puzzle",
-      packages=find_packages(exclude=['EnvImages']),
+      packages=find_packages(exclude=['imgs']),
 )
