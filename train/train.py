@@ -10,12 +10,12 @@ import torch
 
 import gym
 import gym_puzzles
-
+import argparse
 
 def setup_training_parser():
-    import argparse
+    
+    parser = argparse.ArgumentParser(add_help=False)
 
-    parser = argparse.ArgumentParser()
     parser.add_argument(
         "--config",
         default="./configs/ppo-mrp-v0.json", 
@@ -54,20 +54,99 @@ def setup_training_parser():
         action="store_true",
         help="Save model when done.",
     )
+    parser.add_argument(
+        "--n_envs",
+        default=4,
+        type=int,
+    )
 
-    return parser.parse_args()
+    return parser
+
+
+def setup_alg_params_parser(parent_parser):
+    
+    parser = argparse.ArgumentParser(parents=[parent_parser])
+    parser.add_argument(
+        "--learning_rate",
+        default=0.0003, 
+        type=float,
+    )
+    parser.add_argument(
+        "--clip_range",
+        default=0.2,
+        type=float,
+    )
+    parser.add_argument(
+        "--batch_size",
+        default=128,
+        type=int,
+    )
+    parser.add_argument(
+        "--n_epochs",
+        default=10,
+        type=int,
+    )
+    parser.add_argument(
+        "--ent_coef",
+        default=0.01,
+        type=float
+    )
+    parser.add_argument(
+        "--n_steps",
+        default=4096,
+        type=int,
+    )
+    parser.add_argument(
+        "--max_grad_norm",
+        default=0.5,
+        type=float,
+    )
+    parser.add_argument(
+        "--vf_coef",
+        default=0.5,
+        type=float
+    )
+
+    return parser
+    # return parser.parse_args()
 
 
 def main():
 
-    args = setup_training_parser()
+    ALG_HPARAM_NAMES = [
+        'learning_rate',
+        'clip_range',
+        'batch_size',
+        'n_epochs',
+        'ent_coef',
+        'n_steps',
+        'max_grad_norm',
+        'vf_coef'
+    ]
+
+    parent_parser = setup_training_parser()
+    parser = setup_alg_params_parser(parent_parser)
+    args = parser.parse_args()
+    print("args", args)
     cl_config = vars(args)
 
+    # Split out algorithm config
+    alg_config = {}
+    for hparam in ALG_HPARAM_NAMES:
+        if hparam in cl_config:
+            val = cl_config.pop(hparam)
+            alg_config[hparam] = val
+    
+    print("\nalg config: ", alg_config)
+
+    print("\ncl config: ", cl_config)
+    
     # Load config file
     with open(args.config, "r") as f:
         config = json.load(f)
 
     config.update(**cl_config)
+    config['alg_params'].update(**alg_config)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     print(f"Running model on device {device}")
