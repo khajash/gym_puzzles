@@ -24,3 +24,6 @@ share/python-wheels/
 *.egg
 MANIFEST
 
+train/
+wandb/
+*.zip
