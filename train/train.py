@@ -30,7 +30,7 @@ def setup_training_parser():
     )
     parser.add_argument(
         "--total_timesteps",
-        default=1000000,
+        default=10000000,
         type=int,
         help="Number of epochs to run the training. (int, default = 75)",
     )
@@ -124,7 +124,7 @@ def main():
         total_timesteps=config["total_timesteps"],
         log_interval=4,
         callback=WandbCallback(
-            gradient_save_freq=100,
+            gradient_save_freq=10,
             log='all',
             model_save_path=f"models/{run.id}",
             verbose=2,
