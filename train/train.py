@@ -77,7 +77,7 @@ def main():
     if use_wandb:
         run = wandb.init(
             project=config['env'], 
-            group=f"{config['network']}-stable-v1", 
+            group=f"{config['network']}-sb3-v0", 
             config=config, 
             sync_tensorboard=True, 
             monitor_gym=False, 
