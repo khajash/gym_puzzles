@@ -29,3 +29,4 @@ runs/
 wandb/
 models/
 *.zip
+.DS_Store
