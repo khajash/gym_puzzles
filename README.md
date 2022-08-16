@@ -2,7 +2,7 @@
 
 This repository contains custom OpenAI Gym environments using PyBox2D. Each environment contains multiple robots which are centrally controlled by a single agent, whose goal is to move the T-shaped block to the goal location, marked by a blue circle. For true mutli-agent environments check out [multiagent-env](https://github.com/khajash/multiagent-env).
 
-**Note:** This env has been updated to be compatible with `gym==0.21`
+**Note:** These envs were developed in 2018. I have made minor updates to be compatible with `gym==0.21`, but updating the code to be more modular and easy to configure is in progress.
 
 ## Setup
 

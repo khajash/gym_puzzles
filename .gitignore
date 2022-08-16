@@ -27,3 +27,4 @@ MANIFEST
 train/
 wandb/
 *.zip
+.DS_Store
