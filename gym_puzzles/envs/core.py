@@ -7,10 +7,11 @@ import gym
 from gym import spaces
 from gym.utils import seeding
 
-from robot import Robot
-
 import pyglet
 from pyglet import gl
+
+from robot import Robot
+from blocks import Block
 
 FPS = 50
 SCALE   = 30.0   	# affects how fast-paced the game is, forces should be adjusted as well
@@ -26,7 +27,6 @@ DENSE 	= 5.0		# density of blocks
 SPEED 	= 40/SCALE	# speed of robot agent
 
 
-
 # PRECISION FOR BLOCKS IN PLACE
 EPSILON 	= 25.0
 ANG_EPSILON 	= 0.1
@@ -34,14 +34,6 @@ ANG_EPSILON 	= 0.1
 # FIXED REWARDS
 BLOCK_REWARD 	= 10
 FINAL_REWARD	= 10000
-
-# AGENT
-S = 2 		# scale of agents and blocks
-
-AGENT_POLY = [
-	(-0.5/S,-1.5/S), (0.5/S,-1.5/S), (1.5/S,-0.5/S), (1.5/S,0.5/S), 
-	(0.5/S,1.5/S), (-0.5/S,1.5/S), (-1.5/S,0.5/S), (-1.5/S,-0.5/S)
-	]
 
 grey 	= (0.5, 0.5, 0.5)
 white 	= (1., 1., 1.)
@@ -100,7 +92,7 @@ def unitVector(bodyA, bodyB):
 class RobotPuzzleBase(gym.Env):
 	
 	metadata = {
-		'render.modes': ['human', 'rgb_array'],
+		'render.modes': ['human', 'rgb_array', 'agent'],
 		'video.frames_per_second' : FPS,
 	}
 
@@ -145,7 +137,7 @@ class RobotPuzzleBase(gym.Env):
 		a_obs = [np.inf, np.inf, np.inf, np.inf] * self.num_agents
 		# block obs - relative position (x, y) and rotation (theta) to goal, distance to goal
 		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] 
-		# vertices obs - global position of block's vertices 
+		# vertices obs - global position of T-block's vertices
 		vert_obs = [np.inf]*16
 		high = np.array(a_obs + blk_obs + vert_obs)
 	
@@ -169,7 +161,6 @@ class RobotPuzzleBase(gym.Env):
 	# def _setup_obs_space(self):
 	# 	raise NotImplementedError
 
-	# SAME -------------
 	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
 		return [seed]		
@@ -177,15 +168,19 @@ class RobotPuzzleBase(gym.Env):
 	def _destroy(self):
 		if not self.goal_block: return # if NONE then skip reset
 		self.world.contactListener = None
-		# for block in self.blocks:
-		self.world.DestroyBody(self.goal_block)
-		self.goal_block = None
+
+		# Destroy boundary
 		for bound in self.boundary:
 			self.world.DestroyBody(bound)
 		self.boundary = []
+
+		# Destroy blocks
+		self.goal_block.destroy()
+		self.goal_block = None
+
+		# Destroy agents
 		for agent in self.agents:
 			agent.destroy()
-			# self.world.DestroyBody(agent)
 		self.agents = []
 
 	def set_reward_params(self, agentDelta=10, agentDistance=0.1, blockDelta=50, blockDistance=0.025,
@@ -269,47 +264,28 @@ class RobotPuzzleBase(gym.Env):
 	# 	return puzzle_abs_loc
 
 	def _generate_blocks(self):
-		global S
-		global DENSE
 
 		if self.heavy:
-			scaled = 1
+			scale = 1
 			blk_dense = DENSE * 2
 		else:
-			scaled = 2
+			scale = 0.5
 			blk_dense = DENSE
-		self.blocks = []
+		
 		x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
 		y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
-		block = self.world.CreateDynamicBody(
-			position = (x, y),
-			angle=np.random.uniform(0, 2*np.pi), 
-			linearDamping=DAMP, 
-			angularDamping = DAMP,
-			userData="t_block"
-			)
-		block.agent_contact = False # store for contact listener
+		rot = np.random.uniform(0, 2*np.pi)
 
-		t_box = block.CreatePolygonFixture(
-			box=(1/scaled, 1/scaled, (0., -1/scaled),0), 
-			density=blk_dense, 
-			friction=FR, 
-			restitution=RES)
-		t_box2 = block.CreatePolygonFixture(
-			box=(3/scaled, 1/scaled, (0., 1/scaled),0), 
-			density=blk_dense, 
-			friction=FR, 
-			restitution=RES)
-			
-		self.goal_block = block
+		self.goal_block = Block(
+			world=self.world, 
+			init_angle=rot,
+			init_x=x, 
+			init_y=y,
+			scale=scale,
+			density=blk_dense,
+			shape="T"
+		)
 
-		# SAVE vertices data
-		for fix in block.fixtures:
-			# if block.userData in self.blks_vertices.keys():
-			extend_v = [v for v in fix.shape.vertices if v not in self.blks_vertices]
-			self.blks_vertices.extend(extend_v)
-			# else:
-			# 	self.blks_vertices[block.userData] = fix.shape.vertices
 
 	def _generate_agents(self):
 		self.agents = []
@@ -357,22 +333,22 @@ class RobotPuzzleBase(gym.Env):
 		self._calculate_distance()
 		self._calculate_agent_distance()
 
-		self.drawlist = self.boundary + [self.goal_block] 
+		# self.drawlist = self.boundary + [self.goal_block] 
 
 		return self.step(self.action_space.sample())[0]
 
 	def step(self, action):
-		# CHOOSE Action 
+		# APPLY Action 
 		for i, agent in enumerate(self.agents):
+			
 			x, y, rot = action[0 + i*3], action[1 + i*3], action[2 + i*3]
-
-			# TAKE Action
 			agent.step(x,y, rot)
 
+			# TODO: move this to class
 			force = 1.1**(-self.agent_dist[agent.userData]) # CHANGE STRENGTH of soft force over time
 			soft_vect = unitVector(agent, self.goal_block)
 			soft_force = (force*soft_vect[0], force*soft_vect[1])
-			self.goal_block.ApplyForce(soft_force, self.goal_block.worldCenter, True)
+			self.goal_block.apply_soft_force(soft_force)
 		
 		# PROGRESS multiple timesteps:
 		self.world.Step(1.0/FPS, 6*30, 2*30)
@@ -417,9 +393,7 @@ class RobotPuzzleBase(gym.Env):
 		self.state.extend([x-fx, y-fy, a_diff])
 		self.state.append(distance((x,y), (fx, fy)))
 		# STATE add world vertices location
-		for v in self.blks_vertices:
-			x, y = self.goal_block.GetWorldPoint(v)
-			self.state.extend([x*SCALE, y*SCALE])
+		self.state.extend(self.goal_block.get_vertices(scale=SCALE))
 
 		# CALCULATE rewards
 		reward = 0
@@ -481,6 +455,7 @@ class RobotPuzzleBase(gym.Env):
 				self.viewer.close()
 				self.viewer = None
 			return
+		
 		from gym.envs.classic_control import rendering
 		if self.viewer is None:
 			self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
@@ -503,44 +478,54 @@ class RobotPuzzleBase(gym.Env):
 			(BORDER,					BORDER),],
 			color=(0.2, 0.2, 0.2),
 			linewidth=3)
-
-		# diameter of circles (small and large)		
-		sm_d = 0.02*4
-		lg_d = 0.04*4
-
-
-		# DRAW OBJECTS
-		for obj in self.drawlist:
+		
+		for obj in self.boundary:
 			for f in obj.fixtures:
 				trans = f.body.transform
 				path = [trans*v for v in f.shape.vertices]
-				if 'agent' in obj.userData:
-					self.viewer.draw_polygon(path, color=COLORS['agent'])
-				else:
-					self.viewer.draw_polygon(path, color=COLORS[obj.userData])
-			
-			# DRAW CP
-			if 'agent' in obj.userData:
-				x, y = obj.position
-				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(lg_d, 30, color=COLORS['i_block']).add_attr(t)
+				self.viewer.draw_polygon(path, color=COLORS[obj.userData])
 
-			# DRAW BLOCK + VERTICES
-			if 'block' in obj.userData:
-				x, y = obj.worldCenter
-				t = rendering.Transform(translation=(x, y))
-				self.viewer.draw_circle(lg_d, 30, color=COLORS['cp']).add_attr(t)
-				for v in self.blks_vertices:
-					x, y = obj.GetWorldPoint(v)
-					t = rendering.Transform(translation=(x, y))
-					self.viewer.draw_circle(sm_d, 30, color=COLORS['cp']).add_attr(t)
+		# diameter of circles (small and large)		
+		# sm_d = 0.02*4
+		# lg_d = 0.04*4
+
+
+		# # DRAW OBJECTS
+		for obj in self.boundary:
+			for f in obj.fixtures:
+				trans = f.body.transform
+				path = [trans*v for v in f.shape.vertices]
+				self.viewer.draw_polygon(path, color=COLORS[obj.userData])
+
+		# 		if 'agent' in obj.userData:
+		# 			self.viewer.draw_polygon(path, color=COLORS['agent'])
+		# 		else:
+		# 			self.viewer.draw_polygon(path, color=COLORS[obj.userData])
+			
+		# 	# DRAW CP
+		# 	if 'agent' in obj.userData:
+		# 		x, y = obj.position
+		# 		t = rendering.Transform(translation=(x, y))
+		# 		self.viewer.draw_circle(lg_d, 30, color=COLORS['i_block']).add_attr(t)
+
+		# 	# DRAW BLOCK + VERTICES
+		# 	if 'block' in obj.userData:
+		# 		x, y = obj.worldCenter
+		# 		t = rendering.Transform(translation=(x, y))
+		# 		self.viewer.draw_circle(lg_d, 30, color=COLORS['cp']).add_attr(t)
+		# 		for v in self.blks_vertices:
+		# 			x, y = obj.GetWorldPoint(v)
+		# 			t = rendering.Transform(translation=(x, y))
+		# 			self.viewer.draw_circle(sm_d, 30, color=COLORS['cp']).add_attr(t)
+
+		
+		self.goal_block.draw(self.viewer, mode=mode)
 
 		for agent in self.agents:
 			agent.draw(self.viewer)
 
 
 		# DRAW FINAL POINTS
-		# for f_loc in self.block_final_pos.values():
 		t = rendering.Transform(translation=(self.goal_block_pos[0]/SCALE, self.goal_block_pos[1]/SCALE))
 		self.viewer.draw_circle(EPSILON/SCALE, 30, color=COLORS['final_pt']).add_attr(t)
 
@@ -568,7 +553,7 @@ if __name__=="__main__":
 		if k==key.DOWN	and a[1] > -1.0:	a[1] -= 0.1
 		if k==key.SPACE: 			a[0], a[1] = 0, 0 
 
-	env = RobotPuzzleBase()
+	env = RobotPuzzleBase(heavy=True)
 	print("finished init")
 	env.render()
 	env.reset()
