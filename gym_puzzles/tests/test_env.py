@@ -4,13 +4,13 @@ import gym
 import gym_puzzles
 
 
-
 def main():
 
     to_render = True
     seed = 17
 
-    env = gym.make('MultiRobotPuzzle-v0')
+    env = gym.make('MultiRobotPuzzle-v3')
+    # env = gym.make('LunarLander-v2')
     
     # set random seed
     random.seed(seed)

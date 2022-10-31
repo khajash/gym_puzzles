@@ -10,8 +10,8 @@ from gym.utils import seeding
 import pyglet
 from pyglet import gl
 
-from robot import Robot
-from blocks import Block
+from gym_puzzles.envs.robot import Robot
+from gym_puzzles.envs.blocks import Block
 
 FPS 	= 50
 SCALE   = 30.0   	# affects how fast-paced the game is, forces should be adjusted as well
@@ -366,7 +366,7 @@ class RobotPuzzleBase(gym.Env):
 		# TODO: FIX epsilon with scaling - not matching currently with scaling
 		in_place = self.block_distance <= EPSILON / self.screen_width * 2
 		# print("\nblock distance ", self.block_distance)
-		print(obs)
+		# print(obs)
 
 		# CALCULATE rewards
 		reward = 0
@@ -480,14 +480,17 @@ if __name__=="__main__":
 	reward_sum = 0
 	num_games = 10
 	num_game = 0
+	t = 0
 	while num_game < num_games:
 		env.render()
 		# observation, reward, done, _ = env.step(env.action_space.sample()) # random control
 		observation, reward, done, _ = env.step(a) # keyboard control
 		reward_sum += reward
+		t += 1
 		if done:
-			print("Reward for this episode was: {}".format(reward_sum))
+			print("Reward for this episode was: {}. Timesteps: {}".format(reward_sum, t))
 			reward_sum = 0
+			t = 0
 			num_game += 1
 			env.reset()
 		if escape: break
