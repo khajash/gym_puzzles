@@ -13,10 +13,9 @@ from pyglet import gl
 from robot import Robot
 from blocks import Block
 
-FPS = 50
+FPS 	= 50
 SCALE   = 30.0   	# affects how fast-paced the game is, forces should be adjusted as well
 
-VIEWPORT_W, VIEWPORT_H = int(640), int(480)
 BORDER 	= 1		# border around screen to avoid placing blocks
 
 # ROBOT SETTINGS
@@ -29,26 +28,13 @@ SPEED 	= 40/SCALE	# speed of robot agent
 
 # PRECISION FOR BLOCKS IN PLACE
 EPSILON 	= 25.0
-ANG_EPSILON 	= 0.1
+ANG_EPSILON = 0.1
 
-# FIXED REWARDS
-BLOCK_REWARD 	= 10
-FINAL_REWARD	= 10000
-
-grey 	= (0.5, 0.5, 0.5)
-white 	= (1., 1., 1.)
-lt_grey = (0.2, 0.2, 0.2)
-blue 	= (58./255, 153./255, 1.)
-
-COLORS = {
-	'agent'		: white,
-	't_block'	: grey,
-	'l_block'	: grey,
-	'i_block'	: grey,
-	'cp'		: white,
-	'final_pt'	: blue,
-	'wall'		: lt_grey
-}
+# COLORS
+GREY 	= (0.5, 0.5, 0.5)
+LT_GREY = (0.2, 0.2, 0.2)
+WHITE 	= (1., 1., 1.)
+BLUE 	= (58./255, 153./255, 1.)
 
 
 ###### CONTACT DETECTOR #######################################################################
@@ -76,10 +62,9 @@ class ContactDetector(contactListener):
 
 ###### HELPER FUNCTIONS #######################################################################
 
-
 def distance(pt1, pt2):
-	x, y = [(a-b)**2 for a, b in zip(pt1, pt2)]
-	return (x+y)**0.5
+	sqr_dist = (pt1[0] - pt2[0])**2 + (pt1[1] - pt2[1])**2 
+	return sqr_dist**0.5
 
 def unitVector(bodyA, bodyB):
 	Ax, Ay = bodyA.worldCenter
@@ -125,27 +110,28 @@ class RobotPuzzleBase(gym.Env):
 
 		# REWARD
 		self.agent_dist = {}
-		self.block_distance = {}
-		self.block_angle = {}
+		self.block_distance = None
+		self.block_angle = None
 		self.wall_contact = False
 
 		self.set_reward_params()
 
 		# DEFINE Observation Boundaries
-		self.theta_threshold = 2*np.pi
-		# agent obs - relative location to block (x,y), distance to block, contact with block
-		a_obs = [np.inf, np.inf, np.inf, np.inf] * self.num_agents
-		# block obs - relative position (x, y) and rotation (theta) to goal, distance to goal
-		blk_obs =[np.inf, np.inf, self.theta_threshold, np.inf] 
+		theta_threshold = 2*np.pi
+		# agent obs - relative location to block (x,y), rotation, contact with block
+		a_obs_high = [ 2.5,  2.5,  theta_threshold, 1.0] * self.num_agents
+		a_obs_low  = [-2.5, -2.5, -theta_threshold, 0.0] * self.num_agents
+		# block obs - relative position (x, y) and rotation (theta) to goal
+		blk_obs_high = [ 2.5,  2.5,  theta_threshold]
+		blk_obs_low  = [-2.5, -2.5, -theta_threshold]
 		# vertices obs - global position of T-block's vertices
-		vert_obs = [np.inf]*16
-		high = np.array(a_obs + blk_obs + vert_obs)
+		vert_obs_high = [1.5]*16
+		vert_obs_low = [-1.5]*16
+		high = np.array(a_obs_high + blk_obs_high + vert_obs_high)
+		low = np.array(a_obs_low + blk_obs_low + vert_obs_low)
 	
 
-		self.observation_space = spaces.Box(-high, high, dtype=np.float32)
-		self.state = []
-		# self._setup_obs_space()
-		# self._setup_action_space()
+		self.observation_space = spaces.Box(low, high, dtype=np.float32)
 		action_high = np.array([1] * (3 * self.num_agents))
 		self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
 
@@ -153,13 +139,6 @@ class RobotPuzzleBase(gym.Env):
 
 		self.reset()
 
-	# def _setup_action_space(self):
-	# 	action_high = np.array([1] * (3 * self.num_agents))
-	# 	self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
-	# 	raise NotImplementedError
-
-	# def _setup_obs_space(self):
-	# 	raise NotImplementedError
 
 	def seed(self, seed=None):
 		self.np_random, seed = seeding.np_random(seed)
@@ -167,7 +146,7 @@ class RobotPuzzleBase(gym.Env):
 
 
 	def set_reward_params(self, agentDelta=10, agentDistance=0.1, blockDelta=50, blockDistance=0.025,
-		puzzleComp=10000):
+		puzzleComp=100):
 		self.weight_deltaAgent 			= agentDelta
 		self.weight_agent_dist 			= agentDistance
 		self.weight_deltaBlock 			= blockDelta
@@ -176,8 +155,6 @@ class RobotPuzzleBase(gym.Env):
 
 
 	def update_params(self, timestep, decay):
-		# self.shaped_bounds_penalty = self.out_of_bounds_penalty*decay**(-timestep)
-		self.shaped_blk_bounds_penalty = self.blk_out_of_bounds_penalty*decay**(-timestep)
 		self.shaped_puzzle_reward = self.puzzle_complete_reward*decay**(-timestep)
 
 	def update_goal(self, epoch, nb_epochs):
@@ -195,33 +172,14 @@ class RobotPuzzleBase(gym.Env):
 	def get_blkDist(self):
 		return self.weight_blk_dist
 
-	def _calculate_distance(self):
-		for block in [self.goal_block]:
-			# NOTE: slight differece - norm distance
-			self.block_distance[block.userData] = distance(
-				block.worldCenter*SCALE, 
-				self.goal_block_pos[:2])
-			fangle = self.goal_block_pos[2]
-			self.block_angle[block.userData] = abs(fangle %(2*np.pi) - abs(block.angle)%(2*np.pi))
 
-	def _calculate_agent_distance(self):
-		# for block in self.blocks:
-		# 	print()
-		# 	if block.userData == self.goal_block.userData:
-		for agent in self.agents:
-			# NOTE: uses SCALE vs norm_units
-			self.agent_dist[agent.userData] = distance(
-				agent.worldCenter*SCALE, 
-				self.goal_block.worldCenter*SCALE)
-
-
-	def is_in_place(self, x, y, angle, block):
-		f_x, f_y, f_angle = self.goal_block_pos
-		if abs(f_x - x) > EPSILON:
-			return False
-		if abs(f_y - y) > EPSILON:
-			return False
-		return True
+	# def is_in_place(self, x, y, angle, block):
+	# 	f_x, f_y, f_angle = self.goal_block_pos
+	# 	if abs(f_x - x) > EPSILON:
+	# 		return False
+	# 	if abs(f_y - y) > EPSILON:
+	# 		return False
+	# 	return True
 	
 
 	def _generate_boundary(self, thickness):
@@ -250,8 +208,8 @@ class RobotPuzzleBase(gym.Env):
 			scale = 0.5
 			blk_dense = DENSE
 		
-		x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
-		y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
+		x = np.random.uniform(BORDER, self.screen_width/SCALE-BORDER)
+		y = np.random.uniform(BORDER, self.screen_height/SCALE-BORDER)
 		rot = np.random.uniform(0, 2*np.pi)
 
 		self.goal_block = Block(
@@ -268,8 +226,8 @@ class RobotPuzzleBase(gym.Env):
 	def _generate_agents(self):
 		self.agents = []
 		for i in range(self.num_agents):
-			x = np.random.uniform(BORDER, VIEWPORT_W/SCALE-BORDER)
-			y = np.random.uniform(BORDER, VIEWPORT_H/SCALE-BORDER)
+			x = np.random.uniform(BORDER, self.screen_width/SCALE-BORDER)
+			y = np.random.uniform(BORDER, self.screen_height/SCALE-BORDER)
 
 			self.agents.append(Robot(
 				world=self.world,
@@ -313,16 +271,75 @@ class RobotPuzzleBase(gym.Env):
 		self._generate_agents()
 		self._generate_boundary(BORDER)
 		
-		# RESET goal block
+		# Set goal block - TODO make random version
 		self.goal_block_pos = [
 			self.screen_width//2,
 			self.screen_height//2,
 			0]
 
-		self._calculate_distance()
-		self._calculate_agent_distance()
+		self._get_obs()
 
 		return self.step(self.action_space.sample())[0]
+
+	def _get_norm_pose(self, x, y, rot):
+		width_scale  = self.screen_width / SCALE / 2
+		height_scale = self.screen_height / SCALE / 2
+		x = (x - width_scale) / width_scale
+		y = (y - height_scale) / width_scale
+		rot %= (2*np.pi)
+		return x, y, rot
+
+	def _get_obs(self):
+
+		obs = []
+
+		# Normalize all positions (-1,1) in width and height
+		width_scale  = self.screen_width / SCALE / 2
+		height_scale = self.screen_height / SCALE / 2
+		
+		# Block position
+		# bx, by = self.goal_block.worldCenter
+		bx, by, brot = self._get_norm_pose(*self.goal_block.worldCenter, self.goal_block.angle)
+		# bx = (bx - width_scale) / width_scale
+		# by = (by - height_scale) / height_scale
+		# brot = self.goal_block.angle % (2*np.pi)
+
+		# Agent Obs
+		for agent in self.agents:
+			# ax, ay = agent.worldCenter
+			ax, ay, arot = self._get_norm_pose(*agent.worldCenter, agent.angle)
+			
+			# print("agent rotations: ", agent.angle % (2*np.pi), agent.angle)
+			
+			# ADD agent to block relative location 
+			obs.extend([bx - ax, by - ay])
+			obs.append(arot) # TODO: verify this range is correct
+			# TODO: add velocity
+			
+			# Add distance between agent and block to dict - not necessary in obs
+			self.agent_dist[agent.userData] = distance((ax, ay), (bx, by))
+			
+			# ADD in contact 
+			obs.append(1.0 if agent.goal_contact else 0.0)
+
+		# Block obs 
+		gx, gy = self.goal_block_pos[:2]
+		gx = (gx - self.screen_width / 2) / self.screen_width / 2
+		gy = (gy - self.screen_height / 2) / self.screen_width / 2
+		grot = self.goal_block_pos[2] % (2*np.pi)
+		
+		# relative position of block to goal
+		obs.extend([gx - bx, gy - by, grot - brot])
+		
+		self.block_distance = distance((bx, by), (gx, gy))
+		self.block_angle = grot - brot
+
+		# Obs add world vertices location
+		obs.extend(self.goal_block.get_vertices(
+			norm_fn=lambda  x, y : [(x-width_scale)/width_scale, (y-height_scale)/width_scale]))
+		
+		return obs
+
 
 	def step(self, action):
 		# APPLY Action 
@@ -337,61 +354,30 @@ class RobotPuzzleBase(gym.Env):
 			soft_force = (force*soft_vect[0], force*soft_vect[1])
 			self.goal_block.apply_soft_force(soft_force)
 		
-		# PROGRESS multiple timesteps:
+		# PROGRESS multiple timesteps
 		self.world.Step(1.0/FPS, 6*30, 2*30)
 
 		# CACLUATE distances
 		prev_agent_dist = self.agent_dist.copy()
-		prev_distance = self.block_distance.copy()
-		prev_angle = self.block_angle.copy()
+		prev_distance = self.block_distance
+		prev_angle = self.block_angle
 		
-		self._calculate_distance()
-		self._calculate_agent_distance()
-
-		in_place = []
-		in_contact = False
-
-		# BUILD state
-		self.state = []
-
-		for agent in self.agents:
-			# ADD location relative to goal block 
-			x, y = self.goal_block.worldCenter
-			self.state.extend([
-				agent.worldCenter[0]*SCALE - x*SCALE, 
-				agent.worldCenter[1]*SCALE - y*SCALE,
-				])
-			self.state.append(self.agent_dist[agent.userData])
-			# ADD in contact 
-			self.state.append(1.0 if agent.goal_contact else 0.0)
-
-		# for block in self.blocks:
-		# CALCULATE relative location 
-		x, y = self.goal_block.worldCenter # actual world center - scale below
-		angle = self.goal_block.angle % (2*np.pi)
-		fx, fy, fangle = self.goal_block_pos # block_final_pos[self.goal_block.userData]
-		x *= SCALE
-		y *= SCALE
-		a_diff = fangle %(2*np.pi)- angle
-
-		in_place = self.is_in_place(x, y, angle, self.goal_block)
-		
-		# STATE add relative block location
-		self.state.extend([x-fx, y-fy, a_diff])
-		self.state.append(distance((x,y), (fx, fy)))
-		# STATE add world vertices location
-		self.state.extend(self.goal_block.get_vertices(scale=SCALE))
+		obs = self._get_obs()
+		# TODO: FIX epsilon with scaling - not matching currently with scaling
+		in_place = self.block_distance <= EPSILON / self.screen_width * 2
+		# print("\nblock distance ", self.block_distance)
+		print(obs)
 
 		# CALCULATE rewards
 		reward = 0
 
 		# DISTANCE PENALTY - block to goal 
 		# delta distance between prev timestep and cur timestep to encourage larger positive movements
-		deltaDist = prev_distance[self.goal_block.userData] - self.block_distance[self.goal_block.userData]
-		reward += deltaDist * self.weight_deltaBlock / 4.
+		deltaDist = prev_distance - self.block_distance
+		reward += deltaDist * self.weight_deltaBlock 
 		
 		# negative reward based on distance between block and goal
-		reward -= self.weight_blk_dist * self.block_distance[self.goal_block.userData]/4.
+		reward -= self.weight_blk_dist * self.block_distance
 		
 		# DISTANCE PENALTY - agents to block
 		for agent in self.agents:
@@ -408,28 +394,15 @@ class RobotPuzzleBase(gym.Env):
 		# CHECK if done
 		done = False
 		self.done_status = None
-
-		# CALCULATE new blocks in place
-		# self.prev_blks_in_place = self.blks_in_place 
-		# self.blks_in_place = 0
-		# for complete in in_place:
-		# 	if complete == True:
-		# 		self.blks_in_place += 1
-
-		# ADD reward for each block
-		# -10 for moving a block out of place
-		# +10 for moving a block in place
-		# intended to avoid robot moving a block in and out of place to take get continuous reward
-		reward += in_place * BLOCK_REWARD 
 		
 		# ADD reward for puzzle completion
 		if in_place:
 			done = True
-			reward += FINAL_REWARD
+			reward += self.puzzle_complete_reward
 			self.done_status = "puzzle complete!!"
 			print("puzzle complete!!!!!!!!!!!!!!!!!")
 
-		return np.array(self.state), reward, done, {}
+		return np.array(obs), reward, done, {}
 
 	def _return_status(self):
 		if self.done_status: return self.done_status
@@ -445,33 +418,23 @@ class RobotPuzzleBase(gym.Env):
 		
 		from gym.envs.classic_control import rendering
 		if self.viewer is None:
-			self.viewer = rendering.Viewer(VIEWPORT_W, VIEWPORT_H)
-		self.viewer.set_bounds(0, VIEWPORT_W/SCALE, 0, VIEWPORT_H/SCALE)
+			self.viewer = rendering.Viewer(self.screen_width, self.screen_height)
+		self.viewer.set_bounds(0, self.screen_width/SCALE, 0, self.screen_height/SCALE)
 
 		# Background
 		self.viewer.draw_polygon( [
-			(0,					0),
-			(VIEWPORT_W/SCALE,	0),
-			(VIEWPORT_W/SCALE,	VIEWPORT_H/SCALE),
-			(0, 				VIEWPORT_H/SCALE),],
+			(0,							0),
+			(self.screen_width/SCALE,	0),
+			(self.screen_width/SCALE,	self.screen_height/SCALE),
+			(0, 						self.screen_height/SCALE),],
 			color=(0., 0., 0.) )
-
-		# DRAW BOUNDARY
-		# self.viewer.draw_polyline( [
-		# 	(BORDER,					BORDER),
-		# 	(VIEWPORT_W/SCALE - BORDER,	BORDER),
-		# 	(VIEWPORT_W/SCALE - BORDER,	VIEWPORT_H/SCALE - BORDER),
-		# 	(BORDER,					VIEWPORT_H/SCALE - BORDER),
-		# 	(BORDER,					BORDER),],
-		# 	color=(0.2, 0.2, 0.2),
-		# 	linewidth=3)
 		
 		# Boundary
 		for obj in self.boundary:
 			for f in obj.fixtures:
 				trans = f.body.transform
 				path = [trans*v for v in f.shape.vertices]
-				self.viewer.draw_polygon(path, color=COLORS[obj.userData])
+				self.viewer.draw_polygon(path, color=LT_GREY)
 
 		# Block
 		self.goal_block.draw(self.viewer, mode=mode)
@@ -480,10 +443,9 @@ class RobotPuzzleBase(gym.Env):
 		for agent in self.agents:
 			agent.draw(self.viewer)
 
-
 		# Goal position
 		t = rendering.Transform(translation=(self.goal_block_pos[0]/SCALE, self.goal_block_pos[1]/SCALE))
-		self.viewer.draw_circle(EPSILON/SCALE, 30, color=COLORS['final_pt']).add_attr(t)
+		self.viewer.draw_circle(EPSILON/SCALE, 30, color=BLUE).add_attr(t)
 
 		return self.viewer.render(return_rgb_array = mode=='rgb_array')
 

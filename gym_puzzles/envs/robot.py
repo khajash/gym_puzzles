@@ -53,6 +53,10 @@ class Robot(object):
     @property
     def worldCenter(self):
         return self.agent.worldCenter
+    
+    @property
+    def angle(self):
+        return self.agent.angle
 
     @property
     def goal_contact(self):

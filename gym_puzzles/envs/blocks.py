@@ -115,11 +115,11 @@ class Block(object):
         
         self.block = block
 
-    def get_vertices(self, scale):
+    def get_vertices(self, norm_fn):
         vertices = []
         for v in self.block_vertices:
             x, y = self.block.GetWorldPoint(v)
-            vertices.extend([x*scale, y*scale])
+            vertices.extend(norm_fn(x, y))
         return vertices
 
     def apply_soft_force(self, force):
