@@ -134,8 +134,23 @@ def main():
     #         verbose=2,
     #     ),
     # )
-    model.save("ppo_puzzles_v2")
+    model.save(f"models/{run.id}/ppo_puzzles_v2")
 
+    # del model # remove to demonstrate saving and loading
+
+
+    # model = PPO.load("ppo_puzzles_v2")
+
+    # obs = env.reset()
+    # for i in range(5):
+    #     obs = env.reset()
+    #     while True:
+    #         action, _states = model.predict(obs, deterministic=True)
+    #         obs, reward, done, info = env.step(action)
+    #         env.render()
+    #         if done:
+    #             break
+    # env.close()
 
 
 if __name__ == "__main__":
