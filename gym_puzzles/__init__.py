@@ -27,3 +27,10 @@ register(
     max_episode_steps=2000,
     reward_threshold=500,
 )
+
+register(
+    id='MultiRobotPuzzle-v3',
+    entry_point='gym_puzzles.envs:RobotPuzzleBase',
+    max_episode_steps=1500,
+    reward_threshold=100,
+)
