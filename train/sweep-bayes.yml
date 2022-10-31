@@ -1,0 +1,41 @@
+# Easiest to copy this over to sweep when running in wandb
+program: train.py
+method: bayes
+metric:
+  goal: maximize
+  name: rollout/ep_rew_mean
+parameters:
+  learning_rate:
+    max: 0.001
+    min: 0.00001
+    distribution: uniform
+  clip_range:
+    max: 0.4
+    min: 0.1
+    distribution: uniform
+  batch_size:
+    values: [64, 128, 256, 512]
+    distribution: categorical
+  n_epochs:
+    max: 20
+    min: 5
+    distribution: int_uniform
+  ent_coef:
+    max: 0.02
+    min: 0.005
+    distribution: uniform
+  n_steps:
+    values: [512, 1024, 2048, 4096]
+    distribution: categorical
+  max_grad_norm:
+    max: 2
+    min: 0.25
+    distribution: uniform
+  vf_coef:
+    max: 1
+    min: 0.25
+    distribution: uniform
+  n_envs:
+    max: 8
+    min: 4
+    distribution: int_uniform
