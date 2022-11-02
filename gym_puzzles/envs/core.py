@@ -208,8 +208,9 @@ class RobotPuzzleBase(gym.Env):
 			scale = 0.5
 			blk_dense = DENSE
 		
-		x = np.random.uniform(BORDER, self.screen_width/SCALE-BORDER)
-		y = np.random.uniform(BORDER, self.screen_height/SCALE-BORDER)
+		x = np.random.uniform(self.screen_width/SCALE/3 + 2*BORDER, self.screen_width/SCALE*2/3-2*BORDER)
+		y = np.random.uniform(3*BORDER, self.screen_height/SCALE-3*BORDER)
+		# print(3*BORDER, self.screen_height/SCALE-3*BORDER)
 		rot = np.random.uniform(0, 2*np.pi)
 
 		self.goal_block = Block(
@@ -226,7 +227,7 @@ class RobotPuzzleBase(gym.Env):
 	def _generate_agents(self):
 		self.agents = []
 		for i in range(self.num_agents):
-			x = np.random.uniform(BORDER, self.screen_width/SCALE-BORDER)
+			x = np.random.uniform(BORDER, self.screen_width/SCALE/3-2*BORDER)
 			y = np.random.uniform(BORDER, self.screen_height/SCALE-BORDER)
 
 			self.agents.append(Robot(
@@ -273,9 +274,12 @@ class RobotPuzzleBase(gym.Env):
 		
 		# Set goal block - TODO make random version
 		self.goal_block_pos = [
-			self.screen_width//2,
+			# self.screen_width//2,
+			5/6*self.screen_width - 4/3*BORDER,
 			self.screen_height//2,
 			0]
+
+		# print(self.goal_block_pos)
 
 		self._get_obs()
 
@@ -323,10 +327,14 @@ class RobotPuzzleBase(gym.Env):
 			obs.append(1.0 if agent.goal_contact else 0.0)
 
 		# Block obs 
+		# print(self.goal_block_pos)
 		gx, gy = self.goal_block_pos[:2]
-		gx = (gx - self.screen_width / 2) / self.screen_width / 2
-		gy = (gy - self.screen_height / 2) / self.screen_width / 2
+		# print(gx, gy)
+		gx = (gx - self.screen_width / 2) / (self.screen_width / 2)
+		gy = (gy - self.screen_height / 2) / (self.screen_width / 2)
 		grot = self.goal_block_pos[2] % (2*np.pi)
+
+		# print("scaled goal: ", gx, gy)
 		
 		# relative position of block to goal
 		obs.extend([gx - bx, gy - by, grot - brot])
@@ -472,7 +480,7 @@ if __name__=="__main__":
 		if k==key.SPACE: 			a[0], a[1] = 0, 0 
 
 	env = RobotPuzzleBase(heavy=False)
-	print("finished init")
+	# print("finished init")
 	env.render()
 	env.reset()
 	env.viewer.window.on_key_press = key_press
@@ -487,7 +495,7 @@ if __name__=="__main__":
 		observation, reward, done, _ = env.step(a) # keyboard control
 		reward_sum += reward
 		t += 1
-		if done:
+		if done or t > 30:
 			print("Reward for this episode was: {}. Timesteps: {}".format(reward_sum, t))
 			reward_sum = 0
 			t = 0
