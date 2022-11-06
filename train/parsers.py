@@ -25,7 +25,7 @@ def setup_base_parser():
 
     parser.add_argument(
         "--config",
-        default="./configs/ppo-mrp-v0.json", 
+        default="./configs/ppo-mrp-v3.json", 
         type=str,
         help="Config json filename.",
     )

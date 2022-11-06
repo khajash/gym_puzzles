@@ -16,7 +16,7 @@ import gym_puzzles
 def main():
 
     # Set this to True if you want to override config params with commandline params
-    RUN_WANDB_SWEEP = False
+    RUN_WANDB_SWEEP = True
 
     # Setup argument parsers - go to parsers.py for more info or use --help
     parent_parser = parse.setup_base_parser()
@@ -48,7 +48,7 @@ def main():
     if use_wandb:
         run = wandb.init(
             project=config['env'], 
-            group=f"{config['network']}-sb3-v0", 
+            group=f"{config['network']}-sb3-v1", 
             config=config, 
             sync_tensorboard=True, 
             monitor_gym=False, 
@@ -80,29 +80,40 @@ def main():
     env = DummyVecEnv(env_fn_list)
     # env = VecVideoRecorder(env, f"videos/{run.id}", record_video_trigger=lambda x: x % 2000 == 0, video_length=200)
     env = VecNormalize(env)
-    # print(config['alg_params'])
-    
-    model = PPO(
-        env=env, 
-        verbose=1, 
+    print(config['alg_params'])
+
+    # LOAD MODEL
+    model = PPO.load(
+        "./models/4szcm5qu/ppo_puzzles_v2", 
+        env=env,
         tensorboard_log=f"runs/{run.id}",
-        seed=config['seed'],
         device=device,
-        **config['alg_params'],
+        **config['alg_params']
     )
     
-    model.learn(
-        total_timesteps=config["total_timesteps"],
-        log_interval=4,
-        # NOTE: none of these callbacks are working - FIX THIS
-        callback=WandbCallback(
-            gradient_save_freq=10,
-            log='all',
-            model_save_freq=10,
-            model_save_path=f"models/{run.id}",
-            verbose=2,
-        ),
-    )
+    # model = PPO(
+    #     env=env, 
+    #     verbose=1, 
+    #     tensorboard_log=f"runs/{run.id}",
+    #     seed=config['seed'],
+    #     device=device,
+    #     **config['alg_params'],
+    # )
+    try: 
+        model.learn(
+            total_timesteps=config["total_timesteps"],
+            log_interval=4,
+            # NOTE: none of these callbacks are working - FIX THIS
+            callback=WandbCallback(
+                gradient_save_freq=10,
+                log='all',
+                # model_save_freq=10,
+                # model_save_path=f"models/{run.id}",
+                verbose=2,
+            ),
+        )
+    except Exception as e:
+        print("[LEARN ERROR] ", e)
     # model = PPO(config["policy_type"], env, verbose=1, tensorboard_log=f"runs/{run.id}")
     # env = make_env()
     # alg_config = config['alg_params']
@@ -135,6 +146,7 @@ def main():
     #     ),
     # )
     model.save(f"models/{run.id}/ppo_puzzles_v2")
+    env.save(f"models/{run.id}/saved_env.pkl")
 
     # del model # remove to demonstrate saving and loading
 
