@@ -87,6 +87,7 @@ class RobotPuzzleBase(gym.Env):
 		self, 
 		num_agents: int = 2, 
 		goal_velocity: float = 1.5, 
+		block_density: float = 5.0,
 		heavy: bool = False,
 		hardmode: bool = False
 	):
