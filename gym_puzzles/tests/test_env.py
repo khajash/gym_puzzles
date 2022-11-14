@@ -9,7 +9,7 @@ def main():
     to_render = True
     seed = 17
 
-    env = gym.make('MultiRobotPuzzle-v3')
+    env = gym.make('MultiRobotPuzzle-v3', heavy=True)
     # env = gym.make('LunarLander-v2')
     
     # set random seed
